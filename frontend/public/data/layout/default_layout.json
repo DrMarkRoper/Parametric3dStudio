@@ -1,0 +1,252 @@
+{
+  "version": "1.0",
+  "appId": "parametric3dstudio-v-0-1",
+  "savedAt": "2026-06-14T00:00:00.000Z",
+  "description": "Parametric3dStudio v.0.1 — Features / Canvas / Info three-pane layout",
+  "workspace": {
+    "rowSplit": 100,
+    "rowResizeDisabled": false,
+    "topRow": {
+      "id": "row-top",
+      "visible": true,
+      "collapsed": false,
+      "containers": [
+        {
+          "id": "dc-features",
+          "instanceId": "dc-features-001",
+          "widthPercent": 22,
+          "collapsed": false,
+          "visible": true,
+          "killed": false,
+          "allowTabs": false,
+          "allowClose": false,
+          "allowDragMove": true,
+          "forbidDropBefore": true,
+          "forbidDropAfter": false,
+          "forceCloseOnEmpty": false,
+          "killOnClose": false,
+          "resizable": true,
+          "defaultWidth": 260,
+          "defaultTitle": "Features",
+          "prefixTitle": false,
+          "restrictTabToTypes": ["features"],
+          "activeDocumentId": "doc-features-001",
+          "documentIds": ["doc-features-001"],
+          "rowId": "row-top",
+          "rowIndex": 0
+        },
+        {
+          "id": "dc-canvas",
+          "instanceId": "dc-canvas-001",
+          "widthPercent": 56,
+          "collapsed": false,
+          "visible": true,
+          "killed": false,
+          "allowTabs": false,
+          "allowClose": false,
+          "allowDragMove": true,
+          "forbidDropBefore": false,
+          "forbidDropAfter": false,
+          "forceCloseOnEmpty": false,
+          "killOnClose": false,
+          "resizable": true,
+          "defaultWidth": 720,
+          "defaultTitle": "Canvas",
+          "prefixTitle": false,
+          "restrictTabToTypes": ["canvas"],
+          "activeDocumentId": "doc-canvas-001",
+          "documentIds": ["doc-canvas-001"],
+          "rowId": "row-top",
+          "rowIndex": 1
+        },
+        {
+          "id": "dc-info",
+          "instanceId": "dc-info-001",
+          "widthPercent": 22,
+          "collapsed": false,
+          "visible": true,
+          "killed": false,
+          "allowTabs": false,
+          "allowClose": false,
+          "allowDragMove": true,
+          "forbidDropBefore": false,
+          "forbidDropAfter": true,
+          "forceCloseOnEmpty": false,
+          "killOnClose": false,
+          "resizable": true,
+          "defaultWidth": 300,
+          "defaultTitle": "Info",
+          "prefixTitle": false,
+          "restrictTabToTypes": ["info"],
+          "activeDocumentId": "doc-info-001",
+          "documentIds": ["doc-info-001"],
+          "rowId": "row-top",
+          "rowIndex": 2
+        }
+      ]
+    },
+    "bottomRow": {
+      "id": "row-bottom",
+      "visible": false,
+      "collapsed": true,
+      "containers": []
+    }
+  },
+  "mainToolbar": {
+    "blockOrder": [
+      "tb-file",
+      "tb-edit",
+      "tb-sketch",
+      "tb-create",
+      "tb-modify",
+      "tb-sketchtools",
+      "tb-extrude",
+      "tb-merge",
+      "tb-view"
+    ],
+    "blocks": {
+      "tb-file": {
+        "id": "tb-file",
+        "title": "File",
+        "menuFile": "toolbar_file.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-edit": {
+        "id": "tb-edit",
+        "title": "Edit",
+        "menuFile": "toolbar_edit.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-sketch": {
+        "id": "tb-sketch",
+        "title": "Sketch",
+        "menuFile": "toolbar_sketch.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-create": {
+        "id": "tb-create",
+        "title": "Create",
+        "menuFile": "toolbar_create.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-modify": {
+        "id": "tb-modify",
+        "title": "Modify",
+        "menuFile": "toolbar_modify.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-sketchtools": {
+        "id": "tb-sketchtools",
+        "title": "Sketch Tools",
+        "menuFile": "toolbar_sketchtools.json",
+        "visible": false,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-extrude": {
+        "id": "tb-extrude",
+        "title": "Extrude",
+        "menuFile": "toolbar_extrude.json",
+        "visible": false,
+        "disabled": false,
+        "alignment": "center",
+        "labelMode": "icon-title"
+      },
+      "tb-merge": {
+        "id": "tb-merge",
+        "title": "Merge",
+        "menuFile": "toolbar_merge.json",
+        "visible": false,
+        "disabled": false,
+        "alignment": "center",
+        "labelMode": "icon-title"
+      },
+      "tb-view": {
+        "id": "tb-view",
+        "title": "View",
+        "menuFile": "toolbar_view.json",
+        "visible": false,
+        "disabled": false,
+        "alignment": "right",
+        "labelMode": "icon-only"
+      }
+    }
+  },
+  "statusBar": {
+    "visible": true,
+    "allowClose": false,
+    "text": "Parametric3dStudio v.0.1 ready."
+  },
+  "documents": [
+    {
+      "id": "doc-features",
+      "instanceId": "doc-features-001",
+      "componentType": "FeaturesPanel",
+      "title": "Features",
+      "tabTitle": "Features",
+      "visible": true,
+      "allowClose": false,
+      "killOnClose": false,
+      "allowAsTab": true,
+      "restrictToTabTypes": ["features"],
+      "width": { "default": 260, "current": 260, "fixed": false },
+      "toolbarMenus": [],
+      "closedState": null,
+      "defaultContainerOptions": null,
+      "floating": null,
+      "poppedOut": false
+    },
+    {
+      "id": "doc-canvas",
+      "instanceId": "doc-canvas-001",
+      "componentType": "CanvasPanel",
+      "title": "Canvas",
+      "tabTitle": "Canvas",
+      "visible": true,
+      "allowClose": false,
+      "killOnClose": false,
+      "allowAsTab": true,
+      "restrictToTabTypes": ["canvas"],
+      "width": { "default": 720, "current": 720, "fixed": false },
+      "toolbarMenus": [],
+      "closedState": null,
+      "defaultContainerOptions": null,
+      "floating": null,
+      "poppedOut": false
+    },
+    {
+      "id": "doc-info",
+      "instanceId": "doc-info-001",
+      "componentType": "InfoPanel",
+      "title": "Info",
+      "tabTitle": "Info",
+      "visible": true,
+      "allowClose": false,
+      "killOnClose": false,
+      "allowAsTab": true,
+      "restrictToTabTypes": ["info"],
+      "width": { "default": 300, "current": 300, "fixed": false },
+      "toolbarMenus": [],
+      "closedState": null,
+      "defaultContainerOptions": null,
+      "floating": null,
+      "poppedOut": false
+    }
+  ]
+}

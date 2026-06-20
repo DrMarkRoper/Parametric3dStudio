@@ -1,0 +1,521 @@
+* {
+  box-sizing: border-box;
+}
+
+/* Studio-extra tokens — base colours inherited from the MDI theme (light/dark aware). */
+:root {
+  --panel:  var(--surface);
+  --panel2: var(--surface);
+  --muted:  var(--text-dim);
+  --error:  #e05c5c;
+}
+:root[data-theme="light"] {
+  --panel2: #f0f2f6;
+  --error:  #c62828;
+}
+
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.toolbar .sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 6px;
+}
+
+.toolbar .group-label {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 4px 0 2px;
+}
+
+.studio-scope button {
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.studio-scope button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.studio-scope button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.studio-scope button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.studio-scope button.danger:hover:not(:disabled) {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.studio-scope label.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* ---------- Panels ---------- */
+
+.side-panel {
+  width: 250px;
+  min-width: 250px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.props-panel {
+  width: 270px;
+  min-width: 270px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-tabs button {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px;
+  color: var(--muted);
+}
+
+.panel-tabs button.active {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.feature-row:hover {
+  background: var(--panel2);
+}
+
+.feature-row.selected {
+  background: rgba(79, 140, 255, 0.18);
+  outline: 1px solid var(--accent);
+}
+
+.feature-row .ftype {
+  font-size: 10px;
+  color: var(--muted);
+  width: 52px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.feature-row .fname {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature-row .fwarn {
+  color: var(--error);
+  font-size: 13px;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+.feature-row .flock {
+  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: help;
+  opacity: 0.75;
+}
+
+/* Mini row buttons — fixed square so the open eye, closed eye and × all
+   occupy the same footprint regardless of glyph metrics. SVGs inside inherit
+   `currentColor`, so the row's hover / hidden styling cascades through. */
+.feature-row .mini {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.feature-row .mini:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+:root[data-theme="light"] .feature-row .mini:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Closed-eye stays a muted grey even on hover, to reinforce "this feature is
+   currently hidden". Hover still nudges it brighter so it's clearly clickable. */
+.feature-row .mini-eye-closed {
+  color: var(--text-dim);
+  opacity: 0.65;
+}
+.feature-row .mini-eye-closed:hover {
+  color: var(--text-dim);
+  opacity: 0.9;
+}
+
+/* Delete cross: red tint on hover. */
+.feature-row .mini-close:hover {
+  background: rgba(220, 60, 60, 0.18);
+  color: #e05c5c;
+}
+
+.param-block {
+  padding: 6px 0 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.param-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+
+.param-row input {
+  min-width: 0;
+  flex: 1;
+}
+
+.param-row .pval {
+  max-width: 90px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Inputs ---------- */
+
+.studio-scope input,
+.studio-scope select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  width: 100%;
+}
+
+.studio-scope input:focus,
+.studio-scope select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.studio-scope input.invalid {
+  border-color: var(--error);
+}
+
+.studio-scope input[type='checkbox'] {
+  width: auto;
+}
+
+.studio-scope input[type='color'] {
+  padding: 0;
+  height: 24px;
+  width: 40px;
+}
+
+.field {
+  margin-bottom: 8px;
+}
+
+.field > .flabel {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.field .hint {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.field-row {
+  display: flex;
+  gap: 6px;
+}
+
+.field-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.props-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+
+.props-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 12px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- Viewport ---------- */
+
+.viewport-wrap {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.viewport-wrap canvas {
+  display: block;
+}
+
+.dim-input {
+  position: absolute;
+  z-index: 10;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.dim-input .dlabel {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dim-input input {
+  width: 110px;
+}
+
+.sketch-badge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 18, 25, 0.78);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 4px 14px;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+:root[data-theme="light"] .sketch-badge {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 2px 6px rgba(60, 70, 100, 0.18);
+}
+
+/* ---------- Status bar ---------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 10px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 28px;
+}
+
+.statusbar .hint {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.statusbar .coords {
+  font-family: ui-monospace, monospace;
+  min-width: 140px;
+}
+
+.statusbar .errors {
+  color: var(--error);
+  max-width: 420px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.statusbar .grid-ctl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.statusbar .grid-ctl input[type='number'] {
+  width: 56px;
+  padding: 2px 4px;
+}
+
+.colour-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.colour-row input[type='range'] {
+  flex: 1;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.colour-row .pval {
+  color: var(--muted);
+  font-size: 11px;
+  min-width: 34px;
+  text-align: right;
+}
+
+.mod-dot {
+  display: inline-block;
+  flex: 0 0 10px; /* don't let the flex row stretch it */
+  width: 10px;
+  min-width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-bottom: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+.empty-note {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px 4px;
+}
+
+/* ===================================================================== *
+ *  MDI integration overrides
+ *  The studio panels live inside MDI document containers, which own their
+ *  width/height. Override the original fixed widths so each panel fills
+ *  its container, and drop the standalone borders (the container draws them).
+ * ===================================================================== */
+
+.studio-fill {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-fill > .side-panel {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border-right: none;
+}
+
+.studio-fill > .props-panel {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border-left: none;
+}
+
+.studio-canvas {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-canvas .viewport-host {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+
+.studio-canvas .viewport-host canvas {
+  display: block;
+}
+
+/* The modelling status bar sits at the bottom of the canvas panel */
+.studio-canvas .statusbar {
+  flex: 0 0 auto;
+}

@@ -1,0 +1,8 @@
+[
+  { "id": "tbg-cut",       "type": "action", "label": "Cut A−B",     "icon": "⊟", "action": "studio:merge:cut",       "visible": true, "disabled": false, "children": [] },
+  { "id": "tbg-cutswap",   "type": "action", "label": "Cut B−A",     "icon": "⊟", "action": "studio:merge:cutswap",   "visible": true, "disabled": false, "children": [] },
+  { "id": "tbg-fuse",      "type": "action", "label": "Fuse A+B",    "icon": "⊕", "action": "studio:merge:fuse",      "visible": true, "disabled": false, "children": [] },
+  { "id": "tbg-intersect", "type": "action", "label": "Intersect",   "icon": "⊗", "action": "studio:merge:intersect", "visible": true, "disabled": false, "children": [] },
+  { "id": "tbg-sep", "type": "separator" },
+  { "id": "tbg-cancel",    "type": "action", "label": "Cancel",      "icon": "✕", "action": "studio:merge:cancel",    "visible": true, "disabled": false, "children": [] }
+]

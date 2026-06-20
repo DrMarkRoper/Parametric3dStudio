@@ -1,0 +1,5 @@
+[
+  { "id": "tbv-theme",  "type": "action", "label": "Theme",      "icon": "🌓", "action": "onToggleTheme",     "visible": true, "disabled": false, "children": [] },
+  { "id": "tbv-status", "type": "action", "label": "Status Bar", "icon": "📊", "action": "onToggleStatusBar", "visible": true, "disabled": false, "children": [] },
+  { "id": "tbv-reset",  "type": "action", "label": "Reset Layout", "icon": "🔄", "action": "onResetLayout",   "visible": true, "disabled": false, "children": [] }
+]

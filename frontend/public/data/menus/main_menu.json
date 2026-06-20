@@ -1,0 +1,75 @@
+[
+  {
+    "id": "menu-file", "label": "File", "visible": true, "disabled": false,
+    "children": [
+      { "id": "file-new",     "type": "action", "label": "New Project",       "icon": "📄", "shortcut": "Ctrl+Shift+N", "shortcutKey": { "ctrl": true, "shift": true, "key": "n" }, "action": "studio:new",      "visible": true, "disabled": false, "children": [] },
+      { "id": "file-open",    "type": "action", "label": "Open Project…",     "icon": "📂", "shortcut": "Ctrl+Shift+O", "shortcutKey": { "ctrl": true, "shift": true, "key": "o" }, "action": "studio:open",     "visible": true, "disabled": false, "children": [] },
+      { "id": "file-save",    "type": "action", "label": "Save Project",      "icon": "💾", "shortcut": "Ctrl+Shift+S", "shortcutKey": { "ctrl": true, "shift": true, "key": "s" }, "action": "studio:save",     "visible": true, "disabled": false, "children": [] },
+      { "id": "file-save-as", "type": "action", "label": "Save Project As…",  "icon": "💾", "shortcut": "Ctrl+Shift+A", "shortcutKey": { "ctrl": true, "shift": true, "key": "a" }, "action": "studio:saveAs",   "visible": true, "disabled": false, "children": [] },
+      { "id": "file-sep-1", "type": "separator" },
+      { "id": "file-export",  "type": "action", "label": "Export as STL…",    "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:exportStl", "visible": true, "disabled": false, "children": [] }
+    ]
+  },
+  {
+    "id": "menu-edit", "label": "Edit", "visible": true, "disabled": false,
+    "children": [
+      { "id": "edit-undo", "type": "action", "label": "Undo", "icon": "↩", "shortcut": "Ctrl+Z",       "action": "studio:undo", "visible": true, "disabled": false, "children": [] },
+      { "id": "edit-redo", "type": "action", "label": "Redo", "icon": "↪", "shortcut": "Ctrl+Shift+Z", "action": "studio:redo", "visible": true, "disabled": false, "children": [] }
+    ]
+  },
+  {
+    "id": "menu-create", "label": "Create", "visible": true, "disabled": false,
+    "children": [
+      { "id": "cr-box",      "type": "action", "label": "Cube",     "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><path d='M2.5 5 L8 2.2 L13.5 5 L8 7.8 Z'/><path d='M2.5 5 L2.5 11 L8 13.8'/><path d='M13.5 5 L13.5 11 L8 13.8'/><path d='M8 7.8 L8 13.8'/></svg>", "action": "studio:add:box", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-sphere",   "type": "action", "label": "Sphere",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' width='14' height='14'><circle cx='8' cy='8' r='5.6'/><ellipse cx='8' cy='8' rx='5.6' ry='2.1'/></svg>", "action": "studio:add:sphere", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-cylinder", "type": "action", "label": "Cylinder", "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' width='14' height='14'><ellipse cx='8' cy='3.5' rx='5' ry='1.5'/><path d='M3 3.5 L3 12.5'/><path d='M13 3.5 L13 12.5'/><path d='M3 12.5 A5 1.5 0 0 0 13 12.5'/></svg>", "action": "studio:add:cylinder", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-cone",     "type": "action", "label": "Cone",     "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' width='14' height='14'><path d='M8 2 L13 12.5 L3 12.5 Z'/><ellipse cx='8' cy='12.5' rx='5' ry='1.5'/></svg>", "action": "studio:add:cone", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-torus",    "type": "action", "label": "Torus",    "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' width='14' height='14'><ellipse cx='8' cy='8' rx='6' ry='3.6'/><ellipse cx='8' cy='8' rx='2.5' ry='1.2'/></svg>", "action": "studio:add:torus", "visible": true, "disabled": false, "children": [] },
+      {
+        "id": "cr-custom", "type": "submenu", "label": "Custom",
+        "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M2.5 5.5 V12 a1 1 0 0 0 1 1 H12.5 a1 1 0 0 0 1 -1 V6 a1 1 0 0 0 -1 -1 H8 L6.5 3.5 H3.5 a1 1 0 0 0 -1 1 Z'/></svg>",
+        "visible": true, "disabled": false,
+        "children": [
+          { "id": "cr-cu-bulb-screw",  "type": "action", "label": "Bulb screw",  "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M5 2.2 C 3 4 3 7 5 8.5 L 5 11 L 11 11 L 11 8.5 C 13 7 13 4 11 2.2 Z'/><path d='M5 12 L11 12 M5.4 13 L10.6 13 M6 14 L10 14'/></svg>", "action": "studio:add:bulbScrew", "visible": true, "disabled": false, "children": [] },
+          { "id": "cr-cu-bulb-socket", "type": "action", "label": "Bulb socket", "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M3 4 H13 V13 H3 Z'/><path d='M5 4 V13 M11 4 V13'/><path d='M5 5.5 L11 5.5 M5 7.5 L11 7.5 M5 9.5 L11 9.5 M5 11.5 L11 11.5'/></svg>", "action": "studio:add:bulbSocket", "visible": true, "disabled": false, "children": [] },
+          { "id": "cr-cu-screw",       "type": "action", "label": "Screw thread", "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M3 1.5 H13 V4 H3 Z'/><path d='M5 4 V14 M11 4 V14'/><path d='M5 5.5 L11 6.5 M5 7.5 L11 8.5 M5 9.5 L11 10.5 M5 11.5 L11 12.5 M5 13.5 L11 14.5'/></svg>", "action": "studio:add:screwThread", "visible": true, "disabled": false, "children": [] },
+          { "id": "cr-cu-nut",         "type": "action", "label": "Nut thread",  "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M3.5 4.5 L8 2 L12.5 4.5 V11.5 L8 14 L3.5 11.5 Z'/><circle cx='8' cy='8' r='2.8'/><path d='M6 6.5 L10 9.5 M6 9.5 L10 6.5'/></svg>", "action": "studio:add:nutThread", "visible": true, "disabled": false, "children": [] }
+        ]
+      },
+      { "id": "cr-sep-import", "type": "separator" },
+      { "id": "cr-importstl",  "type": "action", "label": "Import STL",  "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:import", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-sep-1", "type": "separator" },
+      { "id": "cr-extrude",  "type": "action", "label": "Extrude",  "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='3' y='10' width='10' height='3.5'/><path d='M8 9 L8 2.5 M5.5 5 L8 2.5 L10.5 5'/></svg>", "action": "studio:extrude", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-sep-2", "type": "separator" },
+      { "id": "cr-move",     "type": "action", "label": "Move",     "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M8 1.7 L8 14.3'/><path d='M1.7 8 L14.3 8'/><path d='M5.5 4 L8 1.5 L10.5 4'/><path d='M5.5 12 L8 14.5 L10.5 12'/><path d='M4 5.5 L1.5 8 L4 10.5'/><path d='M12 5.5 L14.5 8 L12 10.5'/></svg>", "action": "studio:move", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-rotate",   "type": "action", "label": "Rotate",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M3.4 8 A4.6 4.6 0 1 1 8 12.6'/><path d='M5.2 12.6 L8 12.6 L8 9.8'/></svg>", "action": "studio:rotate", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-merge",    "type": "action", "label": "Merge",    "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' width='14' height='14'><circle cx='6' cy='8' r='3.6'/><circle cx='10' cy='8' r='3.6'/></svg>", "action": "studio:merge", "visible": true, "disabled": false, "children": [] }
+    ]
+  },
+  {
+    "id": "menu-sketch", "label": "Sketch", "visible": true, "disabled": false,
+    "children": [
+      { "id": "sk-top",   "type": "action", "label": "Sketch — Top (XZ)",   "icon": "▦",  "action": "studio:sketch:top",   "visible": true, "disabled": false, "children": [] },
+      { "id": "sk-front", "type": "action", "label": "Sketch — Front (XY)", "icon": "▥",  "action": "studio:sketch:front", "visible": true, "disabled": false, "children": [] },
+      { "id": "sk-right", "type": "action", "label": "Sketch — Right (YZ)", "icon": "▤",  "action": "studio:sketch:right", "visible": true, "disabled": false, "children": [] },
+      { "id": "sk-face",  "type": "action", "label": "Sketch on Face…",     "icon": "🧊", "action": "studio:sketch:face",  "visible": true, "disabled": false, "children": [] },
+      { "id": "sk-sep-1", "type": "separator" },
+      { "id": "sk-finish","type": "action", "label": "Finish Sketch",       "icon": "✓",  "action": "studio:finish",       "visible": true, "disabled": false, "children": [] }
+    ]
+  },
+  {
+    "id": "menu-view", "label": "View", "visible": true, "disabled": false,
+    "children": [
+      { "id": "view-theme", "type": "action", "label": "Toggle Light / Dark", "icon": "🌓", "shortcut": "Ctrl+Shift+T", "shortcutKey": { "ctrl": true, "shift": true, "key": "t" }, "action": "onToggleTheme", "visible": true, "disabled": false, "children": [] },
+      { "id": "view-sep-1", "type": "separator" },
+      { "id": "view-reset",     "type": "action", "label": "Reset Workspace Layout", "icon": "🔄", "action": "onResetLayout", "visible": true, "disabled": false, "children": [] }
+    ]
+  },
+  { "id": "menu-window", "label": "Window", "visible": false, "disabled": false, "children": [] },
+  {
+    "id": "menu-help", "label": "Help", "visible": true, "disabled": false,
+    "children": [
+      { "id": "help-about", "type": "action", "label": "About Parametric3dStudio", "icon": "ℹ️", "action": "onAbout", "visible": true, "disabled": false, "children": [] }
+    ]
+  }
+]

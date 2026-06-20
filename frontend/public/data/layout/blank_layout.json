@@ -1,0 +1,79 @@
+{
+  "version": "1.1",
+  "appId": "my-app",
+  "savedAt": "2026-05-09T00:00:00.000Z",
+  "description": "Blank starter layout — one empty main container, bottom row hidden",
+  "workspace": {
+    "rowSplit": 65,
+    "rowResizeDisabled": false,
+    "topRow": {
+      "id": "row-top",
+      "visible": true,
+      "collapsed": false,
+      "containers": [
+        {
+          "id": "dc-main",
+          "instanceId": "dc-main-001",
+          "widthPercent": 100,
+          "collapsed": false,
+          "visible": true,
+          "killed": false,
+          "allowTabs": true,
+          "allowClose": false,
+          "allowDragMove": false,
+          "forbidDropBefore": true,
+          "forbidDropAfter": true,
+          "forceCloseOnEmpty": false,
+          "killOnClose": false,
+          "resizable": true,
+          "defaultWidth": 800,
+          "defaultTitle": "Main",
+          "prefixTitle": false,
+          "restrictTabToTypes": [],
+          "activeDocumentId": null,
+          "documentIds": [],
+          "rowId": "row-top",
+          "rowIndex": 0
+        }
+      ]
+    },
+    "bottomRow": {
+      "id": "row-bottom",
+      "visible": false,
+      "collapsed": false,
+      "containers": []
+    }
+  },
+  "mainToolbar": {
+    "blockOrder": [
+      "tb-file",
+      "tb-view"
+    ],
+    "blocks": {
+      "tb-file": {
+        "id": "tb-file",
+        "title": "File",
+        "menuFile": "toolbar_file.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
+      "tb-view": {
+        "id": "tb-view",
+        "title": "View",
+        "menuFile": "toolbar_view.json",
+        "visible": true,
+        "disabled": false,
+        "alignment": "right",
+        "labelMode": "icon-only"
+      }
+    }
+  },
+  "statusBar": {
+    "visible": true,
+    "allowClose": true,
+    "text": ""
+  },
+  "documents": []
+}

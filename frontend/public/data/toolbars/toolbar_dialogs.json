@@ -1,0 +1,216 @@
+[
+  {
+    "id": "tbd-alert",
+    "type": "submenu",
+    "label": "Alert",
+    "icon": "🔔",
+    "visible": true,
+    "disabled": false,
+    "children": [
+      {
+        "id": "tbd-alert-info",
+        "type": "action",
+        "label": "Information",
+        "icon": "ℹ",
+        "action": "demo:alert:info",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-alert-question",
+        "type": "action",
+        "label": "Question",
+        "icon": "❓",
+        "action": "demo:alert:question",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-alert-warning",
+        "type": "action",
+        "label": "Warning",
+        "icon": "⚠",
+        "action": "demo:alert:warning",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-alert-error",
+        "type": "action",
+        "label": "Error",
+        "icon": "🚫",
+        "action": "demo:alert:error",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      }
+    ]
+  },
+  { "id": "tbd-sep1", "type": "separator" },
+  {
+    "id": "tbd-confirm",
+    "type": "submenu",
+    "label": "Confirm",
+    "icon": "💬",
+    "visible": true,
+    "disabled": false,
+    "children": [
+      {
+        "id": "tbd-confirm-okcancel",
+        "type": "action",
+        "label": "OK / Cancel",
+        "icon": "✔",
+        "action": "demo:confirm:ok-cancel",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-confirm-yesno",
+        "type": "action",
+        "label": "Yes / No",
+        "icon": "👍",
+        "action": "demo:confirm:yes-no",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-confirm-yesnocancel",
+        "type": "action",
+        "label": "Yes / No / Cancel",
+        "icon": "🤔",
+        "action": "demo:confirm:yes-no-cancel",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-confirm-retrycancel",
+        "type": "action",
+        "label": "Retry / Cancel",
+        "icon": "🔁",
+        "action": "demo:confirm:retry-cancel",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-confirm-ari",
+        "type": "action",
+        "label": "Abort / Retry / Ignore",
+        "icon": "⛔",
+        "action": "demo:confirm:abort-retry-ignore",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      }
+    ]
+  },
+  { "id": "tbd-sep2", "type": "separator" },
+  {
+    "id": "tbd-input",
+    "type": "submenu",
+    "label": "Input",
+    "icon": "✏️",
+    "visible": true,
+    "disabled": false,
+    "children": [
+      {
+        "id": "tbd-input-text",
+        "type": "action",
+        "label": "Text (required)",
+        "icon": "T",
+        "action": "demo:input:text",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-input-integer",
+        "type": "action",
+        "label": "Integer  8 – 72",
+        "icon": "#",
+        "action": "demo:input:integer",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-input-float",
+        "type": "action",
+        "label": "Float  0.5 – 3.0",
+        "icon": "⅟",
+        "action": "demo:input:float",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-input-email",
+        "type": "action",
+        "label": "Email",
+        "icon": "✉",
+        "action": "demo:input:email",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-input-url",
+        "type": "action",
+        "label": "URL",
+        "icon": "🔗",
+        "action": "demo:input:url",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      { "id": "tbd-input-sep1", "type": "separator" },
+      {
+        "id": "tbd-input-select",
+        "type": "action",
+        "label": "Select (dropdown)",
+        "icon": "▾",
+        "action": "demo:input:select",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-input-listbox",
+        "type": "action",
+        "label": "Listbox (single)",
+        "icon": "☰",
+        "action": "demo:input:listbox",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      {
+        "id": "tbd-input-multilist",
+        "type": "action",
+        "label": "Listbox (multi-select)",
+        "icon": "☑",
+        "action": "demo:input:multilist",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      },
+      { "id": "tbd-input-sep2", "type": "separator" },
+      {
+        "id": "tbd-input-keepopen",
+        "type": "action",
+        "label": "Keep-open (async validate)",
+        "icon": "🔒",
+        "action": "demo:input:keepopen",
+        "visible": true,
+        "disabled": false,
+        "children": []
+      }
+    ]
+  }
+]

@@ -1,0 +1,1704 @@
+/* ── Design tokens (dark-mode default) ──────────────────────────────────── */
+:root {
+  --bg:        #1c1c1e;
+  --surface:   #2a2a2d;
+  --border:    #3a3a3f;
+  --accent:    #f5a623;
+  --accent2:   #4caf50;
+  --text:      #e8e8ea;
+  --text-dim:  #888888;
+  --titlebar-bg: #2a2a2d;
+  --titlebar-border: #3a3a3f;
+  --toolbar-bg: #2a2a2d;
+  --title-h:   32px;
+  --menubar-h: 28px;
+  --toolbar-h: 36px;
+  --drag-sz:   5px;
+  --container-titlebar-h: 28px;
+  --tabbar-h:  28px;
+  --statusbar-h: 24px;
+  /* Max width applied to tab labels — truncates with ellipsis when exceeded.
+     Used both by the main tab bar (.tab-btn) and the tab-list dropdown.
+     Override at host level (or per element via inline style) to widen/narrow. */
+  --tab-max-width: 160px;
+}
+
+/* ── Light mode overrides ───────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg:        #f6f7fa;
+  --surface:   #ffffff;
+  --border:    #d4d8e0;
+  --accent:    #d4860a;
+  --accent2:   #2e7d32;
+  --text:      #1a1e28;
+  --text-dim:  #5c6472;
+  --titlebar-bg: linear-gradient(135deg, #dde7f5 0%, #cdd8ee 100%);
+  --titlebar-border: #a8bdd8;
+  --toolbar-bg: #eef0f4;
+}
+
+/* ── Global reset ───────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+button { font-family: inherit; font-size: inherit; cursor: pointer; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+input[type="range"], input[type="checkbox"] { accent-color: var(--accent); }
+
+/* ── App shell ──────────────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TITLE BAR
+══════════════════════════════════════════════════════════════════════════ */
+.titlebar {
+  height: var(--title-h);
+  background: linear-gradient(135deg, #0a1a2a 0%, #080810 100%);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  user-select: none;
+  gap: 6px;
+}
+
+:root[data-theme="light"] .titlebar {
+  background: linear-gradient(135deg, #dde7f5 0%, #cdd8ee 100%);
+  border-bottom-color: #a8bdd8;
+}
+
+.titlebar-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+}
+
+.titlebar-version {
+  color: #888;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+:root[data-theme="light"] .titlebar-version { color: var(--text-dim); }
+
+.titlebar-rhs {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 15px;
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.3);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MENU BAR
+══════════════════════════════════════════════════════════════════════════ */
+.menubar {
+  height: var(--menubar-h);
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  user-select: none;
+  position: relative;
+  z-index: 100;
+}
+
+.menubar-item {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  padding: 0 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  transition: background 0.1s;
+  position: relative;
+}
+.menubar-item:hover,
+.menubar-item.open {
+  background: rgba(255,255,255,0.08);
+}
+:root[data-theme="light"] .menubar-item:hover,
+:root[data-theme="light"] .menubar-item.open {
+  background: rgba(0,0,0,0.06);
+}
+
+/* Dropdown panel */
+.menu-dropdown {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  min-width: 200px;
+  z-index: 1100;
+  padding: 3px 0;
+}
+
+.menu-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  white-space: nowrap;
+}
+.menu-dropdown-item:hover:not(:disabled) {
+  background: rgba(255,255,255,0.07);
+}
+/* Keyboard focus — slightly brighter than hover so the cursor is clearly visible */
+.menu-dropdown-item:focus {
+  outline: none;
+  background: rgba(255,255,255,0.13);
+}
+:root[data-theme="light"] .menu-dropdown-item:hover:not(:disabled) {
+  background: rgba(0,0,0,0.05);
+}
+:root[data-theme="light"] .menu-dropdown-item:focus {
+  outline: none;
+  background: rgba(0,0,0,0.09);
+}
+.menu-dropdown-item:disabled,
+.menu-dropdown-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.menu-item-icon  { width: 18px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.menu-item-label { flex: 1; }
+.menu-item-shortcut {
+  margin-left: 24px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.menu-item-arrow  { margin-left: 8px; color: var(--text-dim); font-size: 10px; }
+
+/* Trailing action (e.g. close ×) — sits at the far right of the item,
+   hidden until the item is hovered so it doesn't clutter the list. */
+.menu-item-trailing {
+  margin-left: 8px;
+  padding: 0 3px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-dim);
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 120ms, color 120ms, background 120ms;
+  flex-shrink: 0;
+}
+/* Reveal on row hover (default behaviour) */
+.menu-dropdown-item:hover .menu-item-trailing,
+.menu-dropdown-item:focus .menu-item-trailing {
+  opacity: 1;
+}
+/* Always-visible variant — overrides the opacity:0 default */
+.menu-item-trailing.always-visible {
+  opacity: 1;
+}
+.menu-item-trailing:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.menu-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0;
+}
+
+.menu-section-title {
+  padding: 6px 12px 2px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: default;
+}
+
+/* Submenu flyout */
+.menu-submenu-container {
+  position: relative;
+}
+.menu-submenu-flyout {
+  position: absolute;
+  left: 100%;
+  top: -3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 4px 4px 16px rgba(0,0,0,0.45);
+  min-width: 160px;
+  padding: 3px 0;
+  z-index: 1101;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MAIN TOOLBAR
+══════════════════════════════════════════════════════════════════════════ */
+.main-toolbar {
+  height: var(--toolbar-h);
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  gap: 0;
+  flex-shrink: 0;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* ── Toolbar alignment zones ─────────────────────────────────────────────
+   Three zones: left and right each take equal flex-grow so the center
+   zone (when present) sits truly centred; without a center zone the
+   right zone still correctly anchors to the far end.
+   The doc-toolbar strip also uses these classes. */
+
+.toolbar-zone {
+  display: flex;
+  align-items: center;
+}
+
+/* Left zone: anchored to the toolbar's left edge */
+.toolbar-zone-left {
+  flex: 1;
+  justify-content: flex-start;
+}
+
+/* Center zone: natural width, centred by the equal left/right flex-grow */
+.toolbar-zone-center {
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+/* Right zone: anchored to the toolbar's right edge */
+.toolbar-zone-right {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.toolbar-block {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  position: relative;
+}
+
+.toolbar-block-drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  padding: 0 3px;
+  color: var(--text-dim);
+  font-size: 13px;
+  letter-spacing: -1px;
+  opacity: 0.7;
+}
+.toolbar-block-drag-handle:hover { color: var(--text); opacity: 1; }
+.toolbar-block-drag-handle:active { cursor: grabbing; }
+
+.toolbar-block-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.toolbar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  padding: 2px 6px;
+  min-width: 32px;
+  height: 28px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  position: relative;
+}
+.toolbar-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.07);
+  border-color: var(--border);
+}
+:root[data-theme="light"] .toolbar-btn:hover:not(:disabled) {
+  background: rgba(0,0,0,0.05);
+}
+.toolbar-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--text-dim);
+  position: relative;
+}
+.toolbar-btn:disabled .toolbar-btn-icon,
+.toolbar-btn:disabled .toolbar-btn-label {
+  filter: grayscale(1);
+  color: var(--text-dim);
+}
+/* Diagonal "no entry" slash overlay so the disabled cue is unambiguous
+   even when the underlying icon is a colourful emoji. */
+.toolbar-btn:disabled::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 1.5px;
+  background: var(--text-dim);
+  transform: rotate(-22deg);
+  transform-origin: center;
+  pointer-events: none;
+  opacity: 0.7;
+  border-radius: 1px;
+}
+.toolbar-btn.active {
+  background: rgba(245,166,35,0.18);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+:root[data-theme="light"] .toolbar-btn.active {
+  background: rgba(212,134,10,0.15);
+}
+
+/* ── Currently-selected studio tool highlight ───────────────────────────
+   useStudioActions writes data-studio-tool / data-studio-construction onto
+   <html>. Toolbar buttons carry a data-action attribute, so a CSS attribute
+   selector is enough to light up the matching button in blue. */
+:root[data-studio-tool="select"]    .toolbar-btn[data-action="studio:tool:select"],
+:root[data-studio-tool="line"]      .toolbar-btn[data-action="studio:tool:line"],
+:root[data-studio-tool="rect"]      .toolbar-btn[data-action="studio:tool:rect"],
+:root[data-studio-tool="circle"]    .toolbar-btn[data-action="studio:tool:circle"],
+:root[data-studio-tool="arc"]       .toolbar-btn[data-action="studio:tool:arc"],
+:root[data-studio-tool="fillet"]    .toolbar-btn[data-action="studio:tool:fillet"],
+:root[data-studio-tool="chamfer"]   .toolbar-btn[data-action="studio:tool:chamfer"],
+:root[data-studio-tool="image"]     .toolbar-btn[data-action="studio:tool:image"],
+:root[data-studio-tool="measure"]   .toolbar-btn[data-action="studio:tool:measure"],
+:root[data-studio-tool="dimension"] .toolbar-btn[data-action="studio:tool:dimension"],
+:root[data-studio-tool="offset"]    .toolbar-btn[data-action="studio:tool:offset"],
+:root[data-studio-construction="on"] .toolbar-btn[data-action="studio:construction"] {
+  background: rgba(91, 141, 239, 0.16);
+  border-color: #5b8def;
+  color: #5b8def;
+}
+:root[data-studio-tool="select"]    .toolbar-btn[data-action="studio:tool:select"]    .toolbar-btn-label,
+:root[data-studio-tool="line"]      .toolbar-btn[data-action="studio:tool:line"]      .toolbar-btn-label,
+:root[data-studio-tool="rect"]      .toolbar-btn[data-action="studio:tool:rect"]      .toolbar-btn-label,
+:root[data-studio-tool="circle"]    .toolbar-btn[data-action="studio:tool:circle"]    .toolbar-btn-label,
+:root[data-studio-tool="arc"]       .toolbar-btn[data-action="studio:tool:arc"]       .toolbar-btn-label,
+:root[data-studio-tool="fillet"]    .toolbar-btn[data-action="studio:tool:fillet"]    .toolbar-btn-label,
+:root[data-studio-tool="chamfer"]   .toolbar-btn[data-action="studio:tool:chamfer"]   .toolbar-btn-label,
+:root[data-studio-tool="image"]     .toolbar-btn[data-action="studio:tool:image"]     .toolbar-btn-label,
+:root[data-studio-tool="measure"]   .toolbar-btn[data-action="studio:tool:measure"]   .toolbar-btn-label,
+:root[data-studio-tool="dimension"] .toolbar-btn[data-action="studio:tool:dimension"] .toolbar-btn-label,
+:root[data-studio-tool="offset"]    .toolbar-btn[data-action="studio:tool:offset"]    .toolbar-btn-label,
+:root[data-studio-construction="on"] .toolbar-btn[data-action="studio:construction"] .toolbar-btn-label {
+  color: #5b8def;
+}
+:root[data-theme="light"] :root[data-studio-tool] .toolbar-btn.active,
+:root[data-theme="light"][data-studio-construction="on"] .toolbar-btn[data-action="studio:construction"] {
+  background: rgba(91, 141, 239, 0.12);
+}
+
+.toolbar-btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.toolbar-btn-icon  { font-size: 15px; line-height: 1; }
+.toolbar-btn-label { font-size: 9px; color: var(--text-dim); line-height: 1; }
+.toolbar-btn.active .toolbar-btn-label { color: var(--accent); }
+/* Down-arrow on submenu buttons — in-flow on RHS, vertically centred */
+.toolbar-btn-chevron {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-dim);
+  pointer-events: none;
+  align-self: center;
+}
+.toolbar-btn.active .toolbar-btn-chevron { color: var(--accent); }
+
+/* Toolbar button dropdown (submenu portal — rendered into document.body via
+   React portal so it is never clipped by overflow:hidden ancestors).
+   Position and z-index are set via inline style; only visual styling here. */
+.toolbar-btn-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  min-width: 160px;
+  padding: 3px 0;
+}
+
+/* Drop indicator during block drag */
+.toolbar-drop-indicator {
+  width: 3px;
+  height: 26px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.toolbar-drop-indicator.no-op {
+  background: #8b2020;
+}
+
+/* Disable pointer events on chrome bars during a container panel drag
+   so mouseup always reaches the window listener in DragContext cleanly */
+.mdi-container-dragging .titlebar,
+.mdi-container-dragging .menubar,
+.mdi-container-dragging .main-toolbar,
+.mdi-container-dragging .statusbar {
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MDI WORKSPACE
+══════════════════════════════════════════════════════════════════════════ */
+.mdi-workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── MDI Row ──────────────────────────────────────────────────────────── */
+.mdi-row {
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Restore strip shown when a row is collapsed */
+.vcol-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  background: #0d1e30;
+  border-top: 1px solid #1a3a5c;
+  border-bottom: 1px solid #1a3a5c;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  z-index: 10;
+  user-select: none;
+  gap: 6px;
+}
+.vcol-strip:hover { background: #152840; }
+.vcol-strip span {
+  font-size: 10px;
+  color: #5badea;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+:root[data-theme="light"] .vcol-strip {
+  background: linear-gradient(135deg, #cdd8ee 0%, #bccce0 100%);
+  border-top-color: #a8bdd8;
+  border-bottom-color: #a8bdd8;
+}
+:root[data-theme="light"] .vcol-strip:hover {
+  background: linear-gradient(135deg, #bccce0 0%, #aabbd2 100%);
+}
+:root[data-theme="light"] .vcol-strip span {
+  color: #2a4a6e;
+}
+
+/* Empty row drop zone */
+.row-drop-zone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  margin: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  min-height: 80px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.row-drop-zone.drag-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(245, 166, 35, 0.06);
+}
+
+/* ── Vertical row resize divider ────────────────────────────────────────── */
+.vdrag-handle {
+  height: 6px;
+  background: var(--border);
+  cursor: row-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vdrag-handle:hover,
+.vdrag-handle.dragging { background: var(--accent); }
+.vdrag-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 2px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 1px;
+}
+
+/* Collapse arrows inside vdrag */
+.vdrag-arrow {
+  position: absolute;
+  font-size: 8px;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  padding: 0 8px;
+  line-height: 6px;
+  z-index: 11;
+  user-select: none;
+  transition: color 0.15s;
+}
+.vdrag-arrow:hover { color: var(--accent); }
+.vdrag-arrow-up   { left: calc(50% - 40px); }
+.vdrag-arrow-down { right: calc(50% - 40px); }
+
+/* ── Horizontal container resize handle ─────────────────────────────────── */
+.hdrag-handle {
+  width: var(--drag-sz);
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  z-index: 5;
+  transition: background 0.15s;
+  position: relative;
+}
+.hdrag-handle:hover,
+.hdrag-handle.dragging { background: var(--accent); }
+
+/* Non-resizable: no grab cursor, no hover glow for resize */
+.hdrag-handle.no-resize {
+  cursor: default;
+}
+.hdrag-handle.no-resize:hover:not(.tab-drag-over):not(.tab-drag-no-op) {
+  background: var(--border);
+}
+
+/* Handle glows wider when a tab ghost hovers over it */
+.hdrag-handle.tab-drag-over {
+  background: var(--accent);
+  width: 10px;
+  box-shadow: 0 0 8px var(--accent);
+}
+/* No-op: dragged container is already adjacent — dark red, same width expansion */
+.hdrag-handle.tab-drag-no-op {
+  background: #8b2020;
+  width: 10px;
+  box-shadow: 0 0 5px #8b2020;
+}
+
+/* ── Row edge drop zones (tab drag) ──────────────────────────────────────── */
+.row-edge-drop-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 20;
+  pointer-events: auto;
+  transition: background 80ms, box-shadow 80ms;
+}
+.row-edge-drop-zone.left  { left: 0; }
+.row-edge-drop-zone.right { right: 0; }
+
+.row-edge-drop-zone.active {
+  background: var(--accent);
+  box-shadow: inset 0 0 8px var(--accent), 0 0 6px var(--accent);
+}
+.row-edge-drop-zone.no-op {
+  background: #8b2020;
+  box-shadow: inset 0 0 6px #8b2020;
+}
+.hdrag-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 30px;
+  width: 2px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 1px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOCUMENT CONTAINER
+══════════════════════════════════════════════════════════════════════════ */
+.doc-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+.doc-container:last-child { border-right: none; }
+
+/* Source container fades while being dragged */
+.doc-container.drag-source { opacity: 0.35; }
+
+/* Vertical drop indicator line rendered inside .mdi-row */
+.container-drop-indicator {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  margin-left: -2px;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 0 6px var(--accent);
+  transition: background 0.1s, box-shadow 0.1s;
+}
+.container-drop-indicator.no-op {
+  background: #8b2020;
+  box-shadow: 0 0 6px #8b2020;
+}
+
+/* Ghost label that follows the cursor */
+.container-drag-ghost {
+  position: fixed;
+  background: var(--titlebar-bg);
+  border: 1px solid var(--titlebar-border, var(--border));
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  user-select: none;
+}
+
+/* Collapsed state: thin vertical strip */
+.doc-container-collapsed {
+  flex: 0 0 18px !important;
+  cursor: pointer;
+  background: #232325;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.doc-container-collapsed:hover { background: #38383c; }
+
+:root[data-theme="light"] .doc-container-collapsed {
+  background: #cdd8ee;
+  border-right-color: #a8bdd8;
+}
+:root[data-theme="light"] .doc-container-collapsed:hover {
+  background: #bccce0;
+}
+
+.doc-container-collapsed-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+/* Container title bar */
+.container-titlebar {
+  height: var(--container-titlebar-h);
+  background: var(--titlebar-bg);
+  border-top: 1px solid var(--titlebar-border);
+  border-bottom: 1px solid var(--titlebar-border);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 6px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.container-titlebar-title {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.container-titlebar-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.container-titlebar-btn:hover:not(:disabled) {
+  background: rgba(128,128,128,0.2);
+  color: var(--text);
+}
+.container-titlebar-btn:disabled { opacity: 0.3; cursor: default; }
+.container-titlebar-btn.close-btn:hover:not(:disabled) {
+  background: rgba(220, 60, 60, 0.25);
+  color: #ff6b6b;
+}
+
+/* Tab list dropdown from titlebar */
+.tab-list-dropdown {
+  position: absolute;
+  top: var(--container-titlebar-h);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  min-width: 160px;
+  padding: 3px 0;
+  z-index: 300;
+}
+
+.tab-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+.tab-list-item:hover { background: rgba(255,255,255,0.07); }
+.tab-list-item.active { color: var(--accent); }
+.tab-list-item-close {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+.tab-list-item-close:hover { background: rgba(220,60,60,0.25); color: #ff6b6b; }
+
+/* Document area (flex:1, holds the active panel) */
+.doc-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Document toolbar (per-panel) ─────────────────────────────────────── */
+/* display:flex here lets the zone children (toolbar-zone-left/center/right)
+   use flex-grow to fill the strip width, mirroring the main toolbar layout. */
+.doc-toolbar {
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  height: var(--toolbar-h);
+  flex-shrink: 0;
+  gap: 0;
+  user-select: none;
+  width: 100%;
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────────── */
+.tabbar {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: stretch;
+  height: var(--tabbar-h);
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-top: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 0 4px 2px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--accent);
+  border-top-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Tab label — shared by main tab buttons and the tab-list dropdown items.
+   Caps width and truncates with an ellipsis as a fallback for documents that
+   don't supply a short `tabTitle`. The full title is always available via the
+   hover tooltip on the parent button/row. */
+.tab-label {
+  display: inline-block;
+  max-width: var(--tab-max-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  min-width: 0;
+}
+
+.tab-close {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 1px 2px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.tab-close:hover { background: rgba(220,60,60,0.25); color: #ff6b6b; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOCUMENT PANEL HOST
+══════════════════════════════════════════════════════════════════════════ */
+.doc-panel-host {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DUMMY PANEL COMPONENT
+══════════════════════════════════════════════════════════════════════════ */
+.dummy-panel {
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text);
+  background: #0a0a0a;
+}
+:root[data-theme="light"] .dummy-panel { background: #f0f2f5; }
+
+.dummy-panel-heading {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dummy-panel-section {
+  margin-bottom: 16px;
+}
+.dummy-panel-section-title {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dummy-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dummy-table td {
+  padding: 3px 6px;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 11px;
+}
+:root[data-theme="light"] .dummy-table td {
+  border-bottom-color: rgba(0,0,0,0.05);
+}
+.dummy-table td:first-child {
+  white-space: nowrap;
+  color: var(--accent);
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  min-width: 130px;
+  max-width: 160px;
+}
+.dummy-table td:last-child {
+  color: var(--text);
+  font-family: 'Consolas', 'Courier New', monospace;
+  word-break: break-all;
+}
+
+.val-true  { color: #4caf50 !important; }
+.val-false { color: #ef5350 !important; }
+.val-array { color: #64b5f6 !important; }
+.val-null  { color: #888 !important; }
+.val-num   { color: #ffb74d !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   STATUS BAR
+══════════════════════════════════════════════════════════════════════════ */
+.statusbar {
+  height: var(--statusbar-h);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 8px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.statusbar-text {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusbar-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.statusbar-close:hover {
+  background: rgba(220,60,60,0.25);
+  color: #ff6b6b;
+}
+
+/* ── Studio status bar (app-layer, replaces framework status text) ─────── */
+.studio-statusbar {
+  gap: 14px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.studio-statusbar-hint {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.studio-statusbar-errors {
+  color: #e05c5c;
+  max-width: 360px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+:root[data-theme="light"] .studio-statusbar-errors {
+  color: #c62828;
+}
+.studio-statusbar-coords {
+  font-family: ui-monospace, 'Consolas', 'Courier New', monospace;
+  min-width: 140px;
+  color: var(--text);
+}
+.studio-statusbar-grid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+}
+.studio-statusbar-grid label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.studio-statusbar-grid input[type="number"] {
+  width: 56px;
+  padding: 2px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.studio-statusbar-grid input[type="number"]:focus {
+  border-color: var(--accent);
+}
+.studio-statusbar-grid select {
+  padding: 2px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.studio-statusbar-grid select:focus {
+  border-color: var(--accent);
+}
+:root[data-theme="light"] .studio-statusbar-grid input[type="number"],
+:root[data-theme="light"] .studio-statusbar-grid select {
+  background: var(--surface);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   UTILITY
+══════════════════════════════════════════════════════════════════════════ */
+.flex-spacer { flex: 1; }
+.no-select { user-select: none; }
+
+/* Global overlay capture during drag */
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  cursor: col-resize;
+}
+.drag-overlay-row { cursor: row-resize; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TAB DRAG DROP
+══════════════════════════════════════════════════════════════════════════ */
+
+/* Tab drop valid: border rendered via inline overlay div in DocumentContainer */
+
+/* ── Tab reorder indicator (vertical bar within tab bar) ──────────────── */
+.tab-reorder-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  margin-left: -1px;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow: 0 0 5px var(--accent);
+  z-index: 10;
+}
+.tab-reorder-indicator.no-op {
+  background: #8b2020;
+  box-shadow: 0 0 5px #8b2020;
+}
+
+/* ── Container flash (Window menu navigation) ────────────────────────────── */
+@keyframes container-flash {
+  0%   { opacity: 0.75; }
+  15%  { opacity: 0.75; }
+  100% { opacity: 0; }
+}
+
+.container-flash-overlay {
+  position: absolute;
+  inset: 0;
+  background: #1e90ff;
+  pointer-events: none;
+  z-index: 200;
+  border-radius: inherit;
+  animation: container-flash 1s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Float button in container titlebar
+   ═══════════════════════════════════════════════════════════════════ */
+
+.float-btn {
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.float-btn:hover {
+  opacity: 1;
+  color: var(--accent) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Floating Panel Layer + Window
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* The portal layer — sits above MDI (z 800+), below modals (z 900+) */
+.floating-panel-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;  /* layer itself is transparent; children opt-in */
+  z-index: 800;
+}
+
+.floating-panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  pointer-events: all;
+  min-width: 220px;
+  min-height: 28px;
+  overflow: hidden;
+}
+
+/* Semi-transparent during a float-drag so the user can see drop zones below */
+.floating-panel.float-dragging {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* ── Floating panel title bar ───────────────────────────────────── */
+
+.floating-panel-titlebar {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 0 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-radius: 5px 5px 0 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.floating-panel-titlebar.dragging {
+  cursor: grabbing;
+}
+
+/* When minimized, round all corners (no content below) */
+.floating-panel.minimized .floating-panel-titlebar {
+  border-radius: 5px;
+  border-bottom: none;
+}
+
+.floating-panel-title {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* ── Floating panel title bar buttons ───────────────────────────── */
+
+.floating-panel-btn {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.floating-panel-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border-color: var(--border);
+}
+.floating-panel-btn.close-btn:hover {
+  background: rgba(239, 83, 80, 0.2);
+  color: #ef5350;
+  border-color: rgba(239, 83, 80, 0.4);
+}
+
+/* ── Floating panel body ────────────────────────────────────────── */
+
+.floating-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Resize handles ─────────────────────────────────────────────── */
+/* 8 thin invisible strips around the panel edges / corners.         */
+
+.floating-panel-resize {
+  position: absolute;
+  z-index: 10;
+}
+
+/* Edges */
+.floating-panel-resize.n  { top: 0;    left: 6px;  right: 6px;  height: 4px; cursor: n-resize;  }
+.floating-panel-resize.s  { bottom: 0; left: 6px;  right: 6px;  height: 4px; cursor: s-resize;  }
+.floating-panel-resize.w  { left: 0;   top: 6px;   bottom: 6px; width:  4px; cursor: w-resize;  }
+.floating-panel-resize.e  { right: 0;  top: 6px;   bottom: 6px; width:  4px; cursor: e-resize;  }
+
+/* Corners (slightly larger for easier grabbing) */
+.floating-panel-resize.nw { top: 0;    left: 0;    width: 10px; height: 10px; cursor: nw-resize; }
+.floating-panel-resize.ne { top: 0;    right: 0;   width: 10px; height: 10px; cursor: ne-resize; }
+.floating-panel-resize.sw { bottom: 0; left: 0;    width: 10px; height: 10px; cursor: sw-resize; }
+.floating-panel-resize.se { bottom: 0; right: 0;   width: 16px; height: 16px; cursor: se-resize; }
+
+/* SE corner: triangular diagonal-stripe grip — clip-path limits the hit   */
+/* area to the corner triangle so it never covers panel content.            */
+.floating-panel-resize.se {
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+.floating-panel-resize.se::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent        0px,
+    transparent        2px,
+    var(--text-dim)    2px,
+    var(--text-dim)    3.5px
+  );
+  opacity: 0.45;
+}
+.floating-panel-resize.se:hover::after { opacity: 0.85; }
+
+/* ── Shared bottom-right resize grip (modal windows) ────────────────────  */
+/* clip-path cuts to a lower-right triangle so it never overlays content.   */
+.window-resize-grip {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  z-index: 20;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  transition: opacity 0.15s;
+}
+.window-resize-grip::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent        0px,
+    transparent        2px,
+    var(--text-dim)    2px,
+    var(--text-dim)    3.5px
+  );
+  opacity: 0.45;
+}
+.window-resize-grip:hover::before { opacity: 0.9; }
+
+/* Body cursor during float drag (set via body class) */
+body.mdi-float-dragging,
+body.mdi-float-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Modal Dialogs
+   ═══════════════════════════════════════════════════════════════════ */
+
+.modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  /* No flex centering here — each .modal-dialog centres itself via CSS transform.
+     This allows multiple stacked modals to cascade independently. */
+  pointer-events: none;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: all;
+  z-index: 0;
+}
+
+.modal-dialog {
+  /* Each dialog positions itself centred by default.
+     Inline styles from ModalDialog.tsx override this on drag or cascade. */
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: all;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 300px;
+  min-height: 100px;
+  max-width: 90vw;
+  max-height: 88vh;
+  overflow: hidden;
+}
+
+.modal-titlebar {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  cursor: grab;
+  user-select: none;
+  gap: 8px;
+}
+
+.modal-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-body {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* Content component padding — use this class inside modal content components
+   so the body scroll area has correct inset without padding on the button bar. */
+.modal-content-pad {
+  padding: 16px;
+}
+
+/* ── Modal button bar ──────────────────────────────────────────────────── */
+
+.modal-button-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 0 6px 6px;
+}
+
+.modal-btn-zone {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.modal-btn-zone.left   { flex: 1; justify-content: flex-start; }
+.modal-btn-zone.center { flex: 0 0 auto; }
+.modal-btn-zone.right  { flex: 1; justify-content: flex-end; }
+
+.modal-btn {
+  padding: 4px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2, var(--surface));
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 0.1s, background 0.1s;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+.modal-btn:hover {
+  filter: brightness(1.15);
+}
+.modal-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+.modal-btn.danger {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Alert / Confirm / Input Dialog shared layout
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Content row: icon on the left, message on the right */
+.dialog-content-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* The message paragraph inside a dialog */
+.dialog-message {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.55;
+  margin: 0;
+  padding-top: 4px;   /* optical alignment with icon centre */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Mode icons ─────────────────────────────────────────────────── */
+
+.dialog-mode-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1;
+  user-select: none;
+  letter-spacing: -0.5px;
+}
+
+.dialog-mode-icon.info {
+  background: #1976d2;
+  color: #fff;
+  font-style: italic;
+  font-size: 21px;
+}
+
+.dialog-mode-icon.question {
+  background: var(--accent);
+  color: #000;
+}
+
+.dialog-mode-icon.warning {
+  /* Triangle shape via clip-path */
+  background: #e67e22;
+  color: #fff;
+  border-radius: 6px;
+  clip-path: polygon(50% 4%, 98% 96%, 2% 96%);
+  font-size: 17px;
+  padding-top: 6px;
+  width: 40px;
+  height: 36px;
+}
+
+.dialog-mode-icon.error {
+  background: #c0392b;
+  color: #fff;
+  font-size: 18px;
+}
+
+/* ── Input field area ────────────────────────────────────────────── */
+
+/* Wrapper below the message in InputDialog */
+.dialog-field {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dialog-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Shared base for text input and dropdown */
+.dialog-input,
+.dialog-select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color 0.12s;
+  line-height: 1.5;
+}
+
+.dialog-input:focus,
+.dialog-select:focus {
+  border-color: var(--accent);
+}
+
+.dialog-input.has-error,
+.dialog-select.has-error {
+  border-color: #c0392b;
+}
+
+:root[data-theme="light"] .dialog-input,
+:root[data-theme="light"] .dialog-select {
+  background: var(--surface);
+}
+
+/* Scrollable list box — single or multi-select */
+.dialog-listbox {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.12s;
+  /* Options padding via option padding is browser-limited; at least give the
+     list box itself a small internal border so items don't butt against the edge */
+  padding: 2px 0;
+}
+
+.dialog-listbox:focus {
+  border-color: var(--accent);
+}
+
+.dialog-listbox.has-error {
+  border-color: #c0392b;
+}
+
+:root[data-theme="light"] .dialog-listbox {
+  background: var(--surface);
+}
+
+/* Option elements inside the listbox */
+.dialog-listbox option {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.dialog-listbox option:checked {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Validation error line */
+.dialog-error-text {
+  font-size: 11px;
+  color: #e74c3c;
+  margin: 0;
+  min-height: 15px;
+  line-height: 1.4;
+}
+
+/* Range hint shown for numeric fields (e.g. "0 – 100") */
+.dialog-range-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.4;
+}

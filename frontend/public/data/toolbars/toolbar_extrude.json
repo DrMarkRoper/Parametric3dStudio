@@ -1,0 +1,4 @@
+[
+  { "id": "tbx-accept", "type": "action", "label": "Accept Extrude", "icon": "✓", "action": "studio:extrude:accept", "visible": true, "disabled": false, "children": [] },
+  { "id": "tbx-cancel", "type": "action", "label": "Cancel",         "icon": "✕", "action": "studio:extrude:cancel", "visible": true, "disabled": false, "children": [] }
+]

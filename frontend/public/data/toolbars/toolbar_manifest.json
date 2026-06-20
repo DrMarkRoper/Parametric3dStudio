@@ -1,0 +1,83 @@
+[
+  {
+    "id": "tb-file",
+    "title": "File",
+    "menuFile": "toolbar_file.json",
+    "visible": true,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-edit",
+    "title": "Edit",
+    "menuFile": "toolbar_edit.json",
+    "visible": true,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-sketch",
+    "title": "Sketch",
+    "menuFile": "toolbar_sketch.json",
+    "visible": true,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-create",
+    "title": "Create",
+    "menuFile": "toolbar_create.json",
+    "visible": true,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-modify",
+    "title": "Modify",
+    "menuFile": "toolbar_modify.json",
+    "visible": true,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-sketchtools",
+    "title": "Sketch Tools",
+    "menuFile": "toolbar_sketchtools.json",
+    "visible": false,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-extrude",
+    "title": "Extrude",
+    "menuFile": "toolbar_extrude.json",
+    "visible": false,
+    "disabled": false,
+    "alignment": "center",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-merge",
+    "title": "Merge",
+    "menuFile": "toolbar_merge.json",
+    "visible": false,
+    "disabled": false,
+    "alignment": "center",
+    "labelMode": "icon-title"
+  },
+  {
+    "id": "tb-view",
+    "title": "View",
+    "menuFile": "toolbar_view.json",
+    "visible": false,
+    "disabled": false,
+    "alignment": "right",
+    "labelMode": "icon-only"
+  }
+]

@@ -1,0 +1,62 @@
+# ───── Operating-system artefacts ─────
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+# macOS resource-fork sidecars (e.g. ._foo.txt)
+._*
+
+# Windows (defensive — kept short)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ───── Editors / IDEs ─────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sublime-*
+
+# ───── Node / Vite frontend ─────
+# These patterns are unanchored so they match in `frontend/` and any future
+# package directory (e.g. `server/` if it grows a node build).
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.tsbuildinfo
+
+# Vite / Vitest / coverage caches
+.cache/
+coverage/
+.nyc_output/
+
+# ───── Logs ─────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ───── Local environment files ─────
+.env
+.env.local
+.env.*.local
+
+# ───── Misc ─────
+# Local scratch / sandbox files Claude / collaborators might drop in the root
+*.bak
+*.tmp

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "tbfmt-bold",
+    "type": "action",
+    "label": "Bold",
+    "icon": "𝗕",
+    "shortcut": "Ctrl+B",
+    "shortcutKey": { "ctrl": true, "key": "b" },
+    "action": "onBold",
+    "visible": true,
+    "disabled": false,
+    "children": []
+  },
+  {
+    "id": "tbfmt-italic",
+    "type": "action",
+    "label": "Italic",
+    "icon": "𝘐",
+    "shortcut": "Ctrl+I",
+    "shortcutKey": { "ctrl": true, "key": "i" },
+    "action": "onItalic",
+    "visible": true,
+    "disabled": false,
+    "children": []
+  },
+  {
+    "id": "tbfmt-underline",
+    "type": "action",
+    "label": "Underline",
+    "icon": "U̲",
+    "action": "onUnderline",
+    "visible": true,
+    "disabled": false,
+    "children": []
+  },
+  { "id": "tbfmt-sep1", "type": "separator" },
+  {
+    "id": "tbfmt-align",
+    "type": "submenu",
+    "label": "Align",
+    "icon": "≡",
+    "visible": true,
+    "disabled": false,
+    "children": [
+      { "id": "tbfmt-align-l", "type": "action", "label": "Left",    "action": "onAlignLeft",   "visible": true, "disabled": false, "children": [] },
+      { "id": "tbfmt-align-c", "type": "action", "label": "Center",  "action": "onAlignCenter", "visible": true, "disabled": false, "children": [] },
+      { "id": "tbfmt-align-r", "type": "action", "label": "Right",   "action": "onAlignRight",  "visible": true, "disabled": false, "children": [] }
+    ]
+  }
+]

@@ -1,0 +1,7 @@
+[
+  { "id": "tbf-new",    "type": "action", "label": "New",     "icon": "📄", "shortcut": "Ctrl+Shift+N", "shortcutKey": { "ctrl": true, "shift": true, "key": "n" }, "action": "studio:new",    "visible": true, "disabled": false, "children": [] },
+  { "id": "tbf-open",   "type": "action", "label": "Open",    "icon": "📂", "shortcut": "Ctrl+Shift+O", "shortcutKey": { "ctrl": true, "shift": true, "key": "o" }, "action": "studio:open",   "visible": true, "disabled": false, "children": [] },
+  { "id": "tbf-save",   "type": "action", "label": "Save",    "icon": "💾", "shortcut": "Ctrl+Shift+S", "shortcutKey": { "ctrl": true, "shift": true, "key": "s" }, "action": "studio:save",   "visible": true, "disabled": false, "children": [] },
+  { "id": "tbf-sep1",   "type": "separator" },
+  { "id": "tbf-export", "type": "action", "label": "Export", "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='16' height='16'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:exportStl", "visible": true, "disabled": false, "children": [] }
+]

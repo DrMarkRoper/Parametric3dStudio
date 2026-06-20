@@ -1,0 +1,4 @@
+[
+  { "id": "tbe-undo", "type": "action", "label": "Undo", "icon": "↩", "shortcut": "Ctrl+Z",       "action": "studio:undo", "visible": true, "disabled": false, "children": [] },
+  { "id": "tbe-redo", "type": "action", "label": "Redo", "icon": "↪", "shortcut": "Ctrl+Shift+Z", "action": "studio:redo", "visible": true, "disabled": false, "children": [] }
+]
