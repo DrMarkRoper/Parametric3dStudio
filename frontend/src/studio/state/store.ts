@@ -106,8 +106,9 @@ interface State {
   selectedEntityIds: string[];        // ground truth for multi-select
   gizmoMode: 'translate' | 'rotate' | null;
   dimPrompt: DimPrompt | null;
-  /** Active "pick faces to extrude" session. */
-  facePick: { sketchId: string; pts: { x: number; y: number }[] } | null;
+  /** Active "pick faces to extrude" session. `editId` is set when re-selecting
+   *  the profile of an existing extrude (otherwise Accept creates a new one). */
+  facePick: { sketchId: string; pts: { x: number; y: number }[]; editId?: string } | null;
   /** Active "merge two objects" session. */
   mergePick: { firstId: string; secondId: string | null } | null;
   /** Waiting for the user to click a 3D face to create a sketch on it. */
@@ -129,6 +130,11 @@ interface State {
 
   /** Transient Assembly-mode drive values + selection + warnings. */
   assembly: AssemblyState;
+
+  /** Viewport projection. Orthographic makes parallel sketch planes line up
+   *  (no perspective parallax); perspective is the default 3D view. */
+  orthographic: boolean;
+  toggleProjection: () => void;
 
   setDoc: (doc: Doc, undoable?: boolean) => void;
   undo: () => void;
@@ -158,7 +164,7 @@ interface State {
   selectEntities: (featureId: string | null, ids: string[]) => void;
   setGizmoMode: (v: 'translate' | 'rotate' | null) => void;
   setDimPrompt: (p: DimPrompt | null) => void;
-  startFacePick: (sketchId: string) => void;
+  startFacePick: (sketchId: string, editId?: string, pts?: { x: number; y: number }[]) => void;
   setFacePickPts: (pts: { x: number; y: number }[]) => void;
   cancelFacePick: () => void;
   startMergePick: (firstId: string) => void;
@@ -223,6 +229,11 @@ export const useStore = create<State>((set, get) => ({
   dirty: false,
 
   assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
+
+  orthographic: false,
+  toggleProjection() {
+    set((s) => ({ orthographic: !s.orthographic }));
+  },
 
   setDoc(doc, undoable = true) {
     set((s) => ({
@@ -404,8 +415,8 @@ export const useStore = create<State>((set, get) => ({
     set({ dimPrompt });
   },
 
-  startFacePick(sketchId) {
-    set({ facePick: { sketchId, pts: [] }, dimPrompt: null, selectedEntityId: null });
+  startFacePick(sketchId, editId, pts = []) {
+    set({ facePick: { sketchId, pts, editId }, dimPrompt: null, selectedEntityId: null });
   },
 
   setFacePickPts(pts) {

@@ -279,10 +279,38 @@ export function startExtrude() {
   s.startFacePick(sk);
 }
 
+/** Re-enter face-pick for an existing extrude so its profile selection can be
+ *  repaired / changed (e.g. after loading a file whose `regionPts` went stale
+ *  from a move made before region-tracking existed). */
+export function reselectExtrudeFaces(extrudeId: string) {
+  const s = useStore.getState();
+  const ex = s.doc.features.find((f) => f.id === extrudeId);
+  if (!ex || ex.type !== 'extrude') return;
+  if (s.mode !== 'sketch' || s.activeSketchId !== ex.sketchId) s.enterSketch(ex.sketchId);
+  s.startFacePick(ex.sketchId, extrudeId, ex.regionPts ?? []);
+}
+
+/** Clear an extrude's saved profile selection so it extrudes all top-level
+ *  closed profiles (`defaultRegions`, which excludes hole interiors). The
+ *  quickest repair for a single-shape sketch. */
+export function resetExtrudeProfiles(extrudeId: string) {
+  const s = useStore.getState();
+  s.updateFeature(extrudeId, (f) => (f.type === 'extrude' ? { ...f, regionPts: undefined } : f));
+}
+
 export function acceptExtrude() {
   const s = useStore.getState();
   const fp = s.facePick;
   if (!fp) return;
+  // Re-selecting an existing extrude's profile: update it in place.
+  if (fp.editId) {
+    const pts = fp.pts.length ? fp.pts : undefined;
+    s.cancelFacePick();
+    s.exitSketch();
+    s.updateFeature(fp.editId, (f) => (f.type === 'extrude' ? { ...f, regionPts: pts } : f));
+    s.select(fp.editId);
+    return;
+  }
   const f: ExtrudeFeature = {
     id: uid(),
     type: 'extrude',

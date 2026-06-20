@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
-import { Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrbitControls, TransformControls } from '@react-three/drei';
+import { Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera, TransformControls } from '@react-three/drei';
 import type { CogProfile, CornerMod, DimensionAnchor, DimensionEntity, Doc, Feature, ImageEntity, ImportFeature, Joint, PrimitiveFeature, SketchEntity, SketchFeature, Vec2 } from '../types';
 import { uid } from '../types';
 import { planeBasis, sketchMatrix, type BodyOut } from '../core/buildGeometry';
@@ -639,13 +639,41 @@ function ActiveSketchEditor({ sketch, params }: { sketch: SketchFeature; params:
     s.setDimPrompt({ x: lastScreen.current.x, y: lastScreen.current.y, label, initial, onCommit, onCancel });
   };
 
+  /** Shift any dependent extrude's `regionPts` that sit inside the moved
+   *  entities' (pre-move) bounding box by the same delta, so the extruded face
+   *  travels with the geometry instead of the auto-heal (`chooseRegions`)
+   *  snapping to a different region after the move. `srcDoc` supplies the
+   *  pre-move geometry for the bounds test; `features` is the already-translated
+   *  feature list to patch. Points outside the moved bbox are left alone so
+   *  unrelated regions in the same sketch are unaffected. */
+  const followRegionPts = (features: Feature[], movedIds: string[], d: Vec2, srcDoc: Doc): Feature[] => {
+    const srcSketch = srcDoc.features.find((f) => f.id === sketch.id && f.type === 'sketch') as
+      | SketchFeature
+      | undefined;
+    if (!srcSketch) return features;
+    const movedEnts = srcSketch.entities.filter((e) => movedIds.includes(e.id));
+    const b = movedEnts.length ? entitiesBounds(movedEnts, ref.current.params) : null;
+    if (!b) return features;
+    const pad = 1e-6;
+    const inside = (p: Vec2) =>
+      p.x >= b.min.x - pad && p.x <= b.max.x + pad && p.y >= b.min.y - pad && p.y <= b.max.y + pad;
+    return features.map((f) =>
+      f.type === 'extrude' && f.sketchId === sketch.id && f.regionPts?.length
+        ? { ...f, regionPts: f.regionPts.map((p) => (inside(p) ? { x: p.x + d.x, y: p.y + d.y } : p)) }
+        : f
+    );
+  };
+
   /** Translate one or more entities (and their corner mods) by delta — no undo step. */
   const moveEntitiesBy = (ids: string[], d: Vec2) => {
-    useStore.getState().updateFeature(
-      sketch.id,
-      (f) => translateEntitiesInSketch(f as SketchFeature, ids, d, ref.current.params) as Feature,
-      false
+    const st = useStore.getState();
+    let features = st.doc.features.map((f) =>
+      f.id === sketch.id && f.type === 'sketch'
+        ? (translateEntitiesInSketch(f as SketchFeature, ids, d, ref.current.params) as Feature)
+        : f
     );
+    features = followRegionPts(features, ids, d, st.doc);
+    st.setDoc({ ...st.doc, features }, false);
   };
 
   /* ---- pointer handlers (on the sketch plane) ---- */
@@ -694,11 +722,12 @@ function ActiveSketchEditor({ sketch, params }: { sketch: SketchFeature; params:
       setCursorStatus(p);
       if (dynOpLive.kind === 'move') {
         const delta = { x: p.x - dynOpLive.grabPt.x, y: p.y - dynOpLive.grabPt.y };
-        const newFeatures = dynOpLive.startDoc.features.map((f) =>
+        let newFeatures = dynOpLive.startDoc.features.map((f) =>
           f.id === dynOpLive.sketchId && f.type === 'sketch'
-            ? translateEntitiesInSketch(f as SketchFeature, dynOpLive.entityIds, delta, ref.current.params)
+            ? (translateEntitiesInSketch(f as SketchFeature, dynOpLive.entityIds, delta, ref.current.params) as Feature)
             : f
         );
+        newFeatures = followRegionPts(newFeatures, dynOpLive.entityIds, delta, dynOpLive.startDoc);
         useStore.getState().setDoc({ ...dynOpLive.startDoc, features: newFeatures }, false);
       } else if (dynOpLive.kind === 'rotate') {
         const dx = p.x - dynOpLive.grabPt.x;
@@ -1987,6 +2016,7 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
   const setDimPrompt = useStore((s) => s.setDimPrompt);
 
   const faceSketchMode = useStore((s) => s.faceSketchMode);
+  const orthographic = useStore((s) => s.orthographic);
 
   // ── Assembly mode: joint transform overlay + drive handles ───────────────
   const joints = useStore((s) => s.doc.joints);
@@ -2113,7 +2143,6 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
         <div className="sketch-badge">Click any face on a body to create a sketch on it — Esc cancels</div>
       )}
       <Canvas
-        camera={{ position: [140, 110, 140], fov: 45, near: 0.1, far: 50000 }}
         dpr={[1, 2]}
         onPointerMissed={() => {
           if (mode === 'model') {
@@ -2125,6 +2154,14 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
           }
         }}
       >
+        {/* Projection: orthographic removes perspective parallax so parallel
+            sketch planes (and their grids) line up; perspective is the 3D
+            default. Swapping the makeDefault camera re-binds OrbitControls. */}
+        {orthographic ? (
+          <OrthographicCamera makeDefault position={[140, 110, 140]} zoom={5} near={-100000} far={100000} />
+        ) : (
+          <PerspectiveCamera makeDefault position={[140, 110, 140]} fov={45} near={0.1} far={50000} />
+        )}
         <color attach="background" args={[palette.canvasBg]} />
         <ambientLight intensity={palette.ambient} />
         <directionalLight position={[150, 250, 120]} intensity={palette.keyLight} />

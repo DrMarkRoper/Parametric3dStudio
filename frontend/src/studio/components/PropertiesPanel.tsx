@@ -28,7 +28,7 @@ import { BOLT_PRESETS, BULB_PRESETS, THREAD_SHAPES, isEdisonThread } from '../ty
 import { importCache, nextName, uid, useStore, type DynamicOp } from '../state/store';
 import { tryEval, type Params } from '../core/expressions';
 import { linkKind, resolvedRange, teethRatio, type Range } from '../core/assembly';
-import { cogTeethForFeature } from '../studioBridge';
+import { cogTeethForFeature, reselectExtrudeFaces, resetExtrudeProfiles } from '../studioBridge';
 import type { BodyOut } from '../core/buildGeometry';
 import { dist2d, entitiesBounds, modColor, modsForEntity, rectCorners, resolveDimAnchor, rotateEntitiesInSketch, translateEntitiesInSketch, translateEntityInSketch } from '../core/sketchGeometry';
 import type { CornerMod } from '../types';
@@ -453,6 +453,16 @@ function FeatureProps({ feature, params, bodies }: { feature: Feature; params: P
           autoFocus
           onCommit={(v) => up((f) => ({ ...f, distance: v }) as Feature)}
         />
+        <ExprInput
+          label="Offset (height above plane)"
+          value={feature.offset ?? '0'}
+          params={params}
+          onCommit={(v) => up((f) => ({ ...f, offset: v }) as Feature)}
+        />
+        <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>
+          Perpendicular start height: the extrude begins this far along the sketch
+          plane normal (0 = flush with the plane).
+        </div>
         <div className="field">
           <span className="flabel">Profiles</span>
           <div className="hint">
@@ -460,6 +470,25 @@ function FeatureProps({ feature, params, bodies }: { feature: Feature; params: P
               ? `${feature.regionPts.length} selected region${feature.regionPts.length > 1 ? 's' : ''}`
               : 'All closed profiles in the sketch'}
           </div>
+        </div>
+        <div className="field-row" style={{ gap: 6 }}>
+          <button
+            className="mini"
+            style={{ flex: 1 }}
+            title="Re-pick which closed profiles this extrude uses (opens the sketch's face picker)"
+            onClick={() => reselectExtrudeFaces(feature.id)}
+          >
+            Re-select profiles…
+          </button>
+          <button
+            className="mini"
+            style={{ flex: 1 }}
+            disabled={!feature.regionPts?.length}
+            title="Clear the saved selection and extrude all top-level profiles (holes excluded). Repairs a stale selection from an older file."
+            onClick={() => resetExtrudeProfiles(feature.id)}
+          >
+            Use all profiles
+          </button>
         </div>
         <EdgeControls
           edge={feature.edge}
@@ -1252,11 +1281,26 @@ function MoveRotateBlock({ sketch, entIds, params }: { sketch: SketchFeature; en
   const applyOffset = () => {
     if (vx === null || vy === null || (vx === 0 && vy === 0)) return;
     const d = { x: vx, y: vy };
-    if (entIds.length === 1) {
-      s.updateFeature(sketch.id, (f) => translateEntityInSketch(f as SketchFeature, entIds[0], d, params) as Feature);
-    } else {
-      s.updateFeature(sketch.id, (f) => translateEntitiesInSketch(f as SketchFeature, entIds, d, params) as Feature);
-    }
+    // Carry any dependent extrude's regionPts that sit inside the moved entities'
+    // bbox along with the move, so the extruded face doesn't snap to a different
+    // region (mirrors the interactive drag in Viewport).
+    const movedEnts = sketch.entities.filter((e) => entIds.includes(e.id));
+    const b = entitiesBounds(movedEnts, params);
+    const pad = 1e-6;
+    const inside = (p: Vec2) =>
+      !!b && p.x >= b.min.x - pad && p.x <= b.max.x + pad && p.y >= b.min.y - pad && p.y <= b.max.y + pad;
+    const features = s.doc.features.map((f) => {
+      if (f.id === sketch.id && f.type === 'sketch') {
+        return (entIds.length === 1
+          ? translateEntityInSketch(f as SketchFeature, entIds[0], d, params)
+          : translateEntitiesInSketch(f as SketchFeature, entIds, d, params)) as Feature;
+      }
+      if (f.type === 'extrude' && f.sketchId === sketch.id && f.regionPts?.length) {
+        return { ...f, regionPts: f.regionPts.map((p) => (inside(p) ? { x: p.x + d.x, y: p.y + d.y } : p)) };
+      }
+      return f;
+    });
+    s.setDoc({ ...s.doc, features });
     setDx('0'); setDy('0');
   };
 

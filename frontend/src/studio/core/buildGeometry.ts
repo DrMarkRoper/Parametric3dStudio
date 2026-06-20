@@ -146,6 +146,10 @@ function buildExtrude(f: ExtrudeFeature, sketch: SketchFeature, params: Params):
   const g = new THREE.ExtrudeGeometry(shapes, settings);
   if (useBevel) g.translate(0, 0, edgeSize);
   if (flip) g.translate(0, 0, -depth);
+  // Perpendicular start height: shift the whole solid along the plane normal so
+  // it begins `offset` above the sketch plane instead of at 0.
+  const offset = f.offset ? evalExpression(f.offset, params) : 0;
+  if (offset) g.translate(0, 0, offset);
   g.applyMatrix4(sketchMatrix(sketch, params));
   return g;
 }

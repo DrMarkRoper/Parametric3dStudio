@@ -61,6 +61,8 @@ export function StudioStatusBar() {
   const snap      = useStore((s) => s.doc.snap);
   const setGrid   = useStore((s) => s.setGrid);
   const setSnap   = useStore((s) => s.setSnap);
+  const orthographic = useStore((s) => s.orthographic);
+  const toggleProjection = useStore((s) => s.toggleProjection);
   const cursor    = useCursorStore((s) => s.pos);
   const warnings  = useStore((s) => s.assembly.warnings);
   const { regen } = useRegen();
@@ -98,6 +100,20 @@ export function StudioStatusBar() {
       )}
       <span className="studio-statusbar-coords">
         {mode === 'sketch' && cursor ? `x ${formatNum(cursor.x)}  y ${formatNum(cursor.y)}` : ''}
+      </span>
+      <span className="studio-statusbar-grid">
+        <label>View</label>
+        <select
+          value={orthographic ? 'ortho' : 'persp'}
+          title="Viewport projection: Perspective (3D) or Orthographic (parallel — sketch planes line up)"
+          onChange={(e) => {
+            const wantOrtho = e.target.value === 'ortho';
+            if (wantOrtho !== orthographic) toggleProjection();
+          }}
+        >
+          <option value="persp">Perspective</option>
+          <option value="ortho">Orthographic</option>
+        </select>
       </span>
       <span className="studio-statusbar-grid">
         <label>Grid</label>

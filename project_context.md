@@ -106,7 +106,30 @@ toolbar. Prototype stage.
   (planar arrangement engine includes arcs, ellipses, dimensions are excluded);
   bevel/chamfer on extruded edges; auto-heals when sketch entities move/resize
   /delete (`chooseRegions` snaps saved region points to the nearest region by
-  `rep` distance, falls back to all-profiles if nothing matches).
+  `rep` distance, falls back to all-profiles if nothing matches). Carries
+  `distance` (thickness) **and** an optional `offset` — a perpendicular start
+  height along the plane normal, so the body can begin above the sketch plane
+  instead of flush with it (applied as a local-Z translate in `buildExtrude`).
+  Extrudes are always `op: 'new'` (additive) and never CSG-cut each other — each
+  sketch + its extrusion is independent. When sketch entities are **moved**
+  (interactive drag, dynamic move, or the numeric Move block), the dependent
+  extrude's `regionPts` that lie inside the moved entities' bbox are shifted by
+  the same delta (`followRegionPts` in `Viewport`, mirrored in
+  `PropertiesPanel`) so the extruded face follows the move instead of
+  `chooseRegions` snapping to a different region (e.g. a slot's inner hole-disk).
+  *Known limitation:* rotation of entities does not yet carry `regionPts`.
+  Files saved **before** this fix may already hold stale `regionPts`; the move
+  tracking can't retroactively repair baked-in data, so the Info panel offers
+  **Re-select profiles…** (`reselectExtrudeFaces` → re-enters the sketch face
+  picker bound to that extrude; Accept updates it in place) and **Use all
+  profiles** (`resetExtrudeProfiles` → clears `regionPts` → `defaultRegions`).
+  `facePick` gained an optional `editId` so `acceptExtrude` updates the existing
+  extrude instead of creating a new one.
+  Two solids overlapping on a coplanar face still z-fight in the depth buffer
+  (looks "cropped" along the overlap) — separate them with `offset` or merge.
+  Viewport projection is perspective by default; switch to **Orthographic** (the
+  View select on the status bar) to make parallel planes at different offsets
+  line up.
 - **Detach from sketch**: bakes an extrude into a free-form `ImportFeature`
   (`embedded: true`) that persists in project files and moves/rotates with the
   gizmo.
@@ -361,8 +384,10 @@ Replaces the framework's generic `StatusBar`. Single row at the bottom of the
 shell carrying everything the canvas used to host on its own strip:
 
 - mode/tool hint (with sketch-mode hints per tool)
-- error summary (paramErrors + regen.errors)
+- error summary (paramErrors + regen.errors; includes assembly cycle warnings)
 - live sketch-coord readout (when in sketch mode)
+- **View projection `<select>`** (Perspective / Orthographic → store
+  `orthographic` / `toggleProjection`), placed before the grid/snap controls
 - grid step `<input>` + snap mode `<select>`
 - transient toast text from `SET_STATUS_INTERRUPT` (e.g. "Layout reset to
   default.") preempts the hint while active
@@ -447,7 +472,8 @@ The menu bar (`public/data/menus/main_menu.json`) mirrors the actions:
   Joint, Add Link (Enter disabled in assembly; the rest disabled outside it —
   see §4.5)
 - **View**: Toggle Light / Dark (Ctrl+Shift+T globally registered) · Reset
-  Workspace Layout
+  Workspace Layout (the Orthographic / Perspective projection control lives on
+  the status bar, not this menu — see §4.4)
 - **Window**: hidden by default (toggle `visible: true` in the JSON when
   closable docs come back)
 - **Help**: About

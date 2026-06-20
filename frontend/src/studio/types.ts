@@ -192,6 +192,10 @@ export interface ExtrudeFeature extends FeatureBase {
   type: 'extrude';
   sketchId: string;
   distance: string; // expression (may be negative)
+  /** Optional perpendicular start height along the sketch plane normal. The
+   *  extrude begins this far above the sketch plane (instead of at 0) and runs
+   *  for `distance`. Expression; may be negative. Default 0 / undefined. */
+  offset?: string;
   op: BoolOp;
   edge?: { kind: EdgeKind; size: string };
   color: string;
