@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrbitControls, TransformControls } from '@react-three/drei';
-import type { CogProfile, CornerMod, DimensionAnchor, DimensionEntity, Doc, Feature, ImageEntity, ImportFeature, PrimitiveFeature, SketchEntity, SketchFeature, Vec2 } from '../types';
+import type { CogProfile, CornerMod, DimensionAnchor, DimensionEntity, Doc, Feature, ImageEntity, ImportFeature, Joint, PrimitiveFeature, SketchEntity, SketchFeature, Vec2 } from '../types';
 import { uid } from '../types';
 import { planeBasis, sketchMatrix, type BodyOut } from '../core/buildGeometry';
+import { bodyDeltaMatrix } from '../core/assembly';
 import { tryEval, type Params } from '../core/expressions';
 import {
   applyCornerMods,
@@ -1814,6 +1815,162 @@ function TransformGizmo({
   );
 }
 
+/* ================= Assembly drive handle ================= */
+
+/**
+ * A DOF-constrained drag handle for the selected joint in Assembly mode.
+ * Revolute → an amber ring around the joint axis; dragging sweeps an angle.
+ * Prismatic → an arrow along the joint axis; dragging slides a distance.
+ * Both feed `setJointValue`, which clamps to the resolved range and propagates
+ * across links. The handle sits at the joint origin (fixed) — only the body
+ * moves under the drive.
+ */
+function AssemblyDriveHandle({
+  joints,
+  selectedJointId,
+  jointValues,
+  bodies,
+}: {
+  joints: Joint[];
+  selectedJointId: string | null;
+  jointValues: Record<string, number>;
+  bodies: BodyOut[];
+}) {
+  const { camera, gl, controls } = useThree();
+  const dragRef = useRef<{ startValue: number; startParam: number } | null>(null);
+  const joint = joints.find((j) => j.id === selectedJointId) ?? null;
+
+  const radius = useMemo(() => {
+    if (!joint) return 20;
+    const box = new THREE.Box3();
+    for (const b of bodies) {
+      if (b.featureId !== joint.featureId) continue;
+      b.geometry.computeBoundingBox();
+      if (b.geometry.boundingBox) box.union(b.geometry.boundingBox);
+    }
+    if (box.isEmpty()) return 20;
+    const s = box.getSize(new THREE.Vector3());
+    return Math.max(10, 0.62 * Math.max(s.x, s.y, s.z));
+  }, [joint, bodies]);
+
+  if (!joint) return null;
+
+  const O = new THREE.Vector3(joint.origin[0], joint.origin[1], joint.origin[2]);
+  const A = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]);
+  if (A.lengthSq() < 1e-9) A.set(0, 1, 0);
+  A.normalize();
+  const value = jointValues[joint.id] ?? 0;
+  const raycaster = new THREE.Raycaster();
+
+  const toNdc = (e: PointerEvent) => {
+    const rect = gl.domElement.getBoundingClientRect();
+    return new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+  };
+
+  // Revolute: signed angle (deg) of the pointer about the axis, in the plane
+  // through O perpendicular to A.
+  const angleAt = (e: PointerEvent): number | null => {
+    raycaster.setFromCamera(toNdc(e), camera);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(A, O);
+    const hit = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+    const v = hit.sub(O);
+    const ref = new THREE.Vector3(1, 0, 0);
+    if (Math.abs(A.dot(ref)) > 0.9) ref.set(0, 0, 1);
+    const x = ref.clone().sub(A.clone().multiplyScalar(A.dot(ref))).normalize();
+    const y = new THREE.Vector3().crossVectors(A, x).normalize();
+    return (Math.atan2(v.dot(y), v.dot(x)) * 180) / Math.PI;
+  };
+
+  // Prismatic: parameter along the axis at the point on it closest to the
+  // pointer ray.
+  const paramAt = (e: PointerEvent): number | null => {
+    raycaster.setFromCamera(toNdc(e), camera);
+    const ro = raycaster.ray.origin;
+    const rd = raycaster.ray.direction;
+    const w0 = new THREE.Vector3().subVectors(O, ro);
+    const a = A.dot(A), b = A.dot(rd), c = rd.dot(rd), d = A.dot(w0), eC = rd.dot(w0);
+    const denom = a * c - b * b;
+    if (Math.abs(denom) < 1e-9) return null;
+    return (b * eC - c * d) / denom;
+  };
+
+  const setControls = (enabled: boolean) => {
+    if (controls) (controls as unknown as { enabled: boolean }).enabled = enabled;
+  };
+
+  const onMove = (e: PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (joint.type === 'revolute') {
+      const cur = angleAt(e);
+      if (cur === null) return;
+      let delta = cur - d.startParam;
+      while (delta > 180) delta -= 360;
+      while (delta < -180) delta += 360;
+      useStore.getState().setJointValue(joint.id, d.startValue + delta);
+    } else {
+      const cur = paramAt(e);
+      if (cur === null) return;
+      useStore.getState().setJointValue(joint.id, d.startValue + (cur - d.startParam));
+    }
+  };
+  const onUp = () => {
+    dragRef.current = null;
+    setControls(true);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+  const onDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setControls(false);
+    const start = joint.type === 'revolute' ? angleAt(e.nativeEvent) : paramAt(e.nativeEvent);
+    dragRef.current = { startValue: value, startParam: start ?? 0 };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const HANDLE = '#f5a623';
+  if (joint.type === 'revolute') {
+    // Torus hole-axis is +Z by default → align Z to A.
+    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), A);
+    return (
+      <group position={O} quaternion={quat}>
+        <mesh onPointerDown={onDown} onClick={(e) => e.stopPropagation()}>
+          <torusGeometry args={[radius, Math.max(0.5, radius * 0.05), 12, 48]} />
+          <meshBasicMaterial color={HANDLE} transparent opacity={0.85} depthTest={false} />
+        </mesh>
+        <mesh>
+          <sphereGeometry args={[Math.max(1, radius * 0.08), 16, 16]} />
+          <meshBasicMaterial color={HANDLE} depthTest={false} />
+        </mesh>
+      </group>
+    );
+  }
+  // Prismatic arrow — default geometry along +Y → align Y to A.
+  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), A);
+  const len = radius;
+  return (
+    <group position={O} quaternion={quat}>
+      <mesh position={[0, len / 2, 0]} onPointerDown={onDown} onClick={(e) => e.stopPropagation()}>
+        <cylinderGeometry args={[Math.max(0.4, radius * 0.035), Math.max(0.4, radius * 0.035), len, 12]} />
+        <meshBasicMaterial color={HANDLE} depthTest={false} />
+      </mesh>
+      <mesh position={[0, len, 0]} onPointerDown={onDown} onClick={(e) => e.stopPropagation()}>
+        <coneGeometry args={[Math.max(1, radius * 0.09), Math.max(2, radius * 0.18), 16]} />
+        <meshBasicMaterial color={HANDLE} depthTest={false} />
+      </mesh>
+      <mesh>
+        <sphereGeometry args={[Math.max(1, radius * 0.08), 16, 16]} />
+        <meshBasicMaterial color={HANDLE} depthTest={false} />
+      </mesh>
+    </group>
+  );
+}
+
 /* ================= Viewport ================= */
 
 export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: number; params: Params }) {
@@ -1830,6 +1987,24 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
   const setDimPrompt = useStore((s) => s.setDimPrompt);
 
   const faceSketchMode = useStore((s) => s.faceSketchMode);
+
+  // ── Assembly mode: joint transform overlay + drive handles ───────────────
+  const joints = useStore((s) => s.doc.joints);
+  const jointValues = useStore((s) => s.assembly.jointValues);
+  const selectedJointId = useStore((s) => s.assembly.selectedJointId);
+  const assemblyMode = mode === 'assembly';
+  // Per-body delta transform from its joint(s) at the current drive value.
+  const bodyMatrices = useMemo(() => {
+    const map = new Map<string, THREE.Matrix4>();
+    if (!assemblyMode) return map;
+    for (const b of bodies) {
+      if (map.has(b.featureId)) continue;
+      if (joints.some((j) => j.featureId === b.featureId)) {
+        map.set(b.featureId, bodyDeltaMatrix(b.featureId, joints, jointValues));
+      }
+    }
+    return map;
+  }, [assemblyMode, bodies, joints, jointValues]);
 
   const sketch = (doc.features.find((f) => f.id === activeSketchId && f.type === 'sketch') ?? null) as SketchFeature | null;
   const selected = doc.features.find((f) => f.id === selectedFeatureId);
@@ -1956,7 +2131,7 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
         <directionalLight position={[-120, 80, -80]} intensity={palette.fillLight} />
         <OrbitControls makeDefault />
 
-        {mode === 'model' && (
+        {(mode === 'model' || mode === 'assembly') && (
           <Grid
             position={[0, -0.02, 0]}
             args={[10, 10]}
@@ -1974,7 +2149,11 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
           const isFirst = mergePick?.firstId === b.featureId;
           const isSecond = mergePick?.secondId === b.featureId;
           const isSel = (b.featureId === selectedFeatureId && !mergePick) || isFirst;
-          return (
+          // Assembly mode: bodies with a joint render under a transient delta
+          // transform (the drive). matrixAutoUpdate is off so the matrix is used
+          // verbatim; geometry is baked to world space, so identity = home pose.
+          const deltaM = bodyMatrices.get(b.featureId);
+          const mesh = (
             // Index in the key — some features (e.g. bulbScrew) emit multiple
             // bodies under one featureId; without `i` React would reuse one
             // mesh for both and stale geometry would linger across regens.
@@ -1982,8 +2161,16 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
               key={`${b.featureId}:${i}:${rev}`}
               geometry={b.geometry}
               onClick={(e) => {
-                if (mode !== 'model') return;
+                if (mode !== 'model' && mode !== 'assembly') return;
                 e.stopPropagation();
+                // Assembly mode: clicking a body selects it (so a joint can be
+                // attached / its joint inspected).
+                if (mode === 'assembly') {
+                  select(b.featureId);
+                  const j = useStore.getState().doc.joints.find((jj) => jj.featureId === b.featureId);
+                  if (j) useStore.getState().selectJoint(j.id);
+                  return;
+                }
                 // Face-sketch mode: capture the clicked face to build a sketch on it
                 if (useStore.getState().faceSketchMode) {
                   createSketchOnFace(e);
@@ -2011,7 +2198,24 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
               <Edges threshold={28} color={isSecond ? '#ffaa33' : isSel ? '#4f8cff' : palette.edgeColor} />
             </mesh>
           );
+          return deltaM ? (
+            <group key={`g:${b.featureId}:${i}:${rev}`} matrix={deltaM} matrixAutoUpdate={false}>
+              {mesh}
+            </group>
+          ) : (
+            mesh
+          );
         })}
+
+        {/* assembly drive handle for the selected joint */}
+        {assemblyMode && (
+          <AssemblyDriveHandle
+            joints={joints}
+            selectedJointId={selectedJointId}
+            jointValues={jointValues}
+            bodies={bodies}
+          />
+        )}
 
         {/* sketches (non-active shown faint in model mode) */}
         {sketches

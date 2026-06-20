@@ -62,6 +62,7 @@ export function StudioStatusBar() {
   const setGrid   = useStore((s) => s.setGrid);
   const setSnap   = useStore((s) => s.setSnap);
   const cursor    = useCursorStore((s) => s.pos);
+  const warnings  = useStore((s) => s.assembly.warnings);
   const { regen } = useRegen();
 
   if (!visible) return null;
@@ -76,9 +77,12 @@ export function StudioStatusBar() {
           ? mergePick.secondId
             ? 'Choose the merge operation in the toolbar (cut / fuse / intersect) — or click a different second object'
             : 'Click the second object in the viewport to merge with'
-          : HINTS[`${mode}:${tool}`] ?? HINTS['model:select'];
+          : mode === 'assembly'
+            ? 'Assembly mode — click a body then add a joint · drag a joint handle to drive it · link joints to couple them · changes here are non-permanent'
+            : HINTS[`${mode}:${tool}`] ?? HINTS['model:select'];
 
   const allErrors = [
+    ...warnings,
     ...Object.entries(regen.paramErrors).map(([n, m]) => `${n}: ${m}`),
     ...regen.errors.map((e) => e.message),
   ];

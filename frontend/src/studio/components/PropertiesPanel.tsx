@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
   ArcEntity,
   BooleanFeature,
@@ -11,7 +11,10 @@ import type {
   Feature,
   ImageEntity,
   ImportFeature,
+  Joint,
+  JointType,
   LineEntity,
+  Link,
   MergeOp,
   PrimitiveFeature,
   PrimitiveShape,
@@ -19,10 +22,13 @@ import type {
   SketchEntity,
   SketchFeature,
   ThreadPreset,
+  Vec3,
 } from '../types';
 import { BOLT_PRESETS, BULB_PRESETS, THREAD_SHAPES, isEdisonThread } from '../types';
 import { importCache, nextName, uid, useStore, type DynamicOp } from '../state/store';
 import { tryEval, type Params } from '../core/expressions';
+import { linkKind, resolvedRange, teethRatio, type Range } from '../core/assembly';
+import { cogTeethForFeature } from '../studioBridge';
 import type { BodyOut } from '../core/buildGeometry';
 import { dist2d, entitiesBounds, modColor, modsForEntity, rectCorners, resolveDimAnchor, rotateEntitiesInSketch, translateEntitiesInSketch, translateEntityInSketch } from '../core/sketchGeometry';
 import type { CornerMod } from '../types';
@@ -207,6 +213,15 @@ function ThreadPresetPicker({
 export function PropertiesPanel({ params, bodies }: { params: Params; bodies: BodyOut[] }) {
   const s = useStore();
   const feature = s.doc.features.find((f) => f.id === s.selectedFeatureId);
+
+  // Assembly mode: joints + links editor.
+  if (s.mode === 'assembly') {
+    return (
+      <div className="props-panel" key="assembly">
+        <AssemblyProps params={params} />
+      </div>
+    );
+  }
 
   // Sketch entity selected?
   if (s.mode === 'sketch' && s.activeSketchId) {
@@ -1776,6 +1791,402 @@ function LineProps({
       <div className="empty-note">
         Note: changing length moves only this line's end point; connected lines are not dragged along.
       </div>
+    </>
+  );
+}
+
+/* ================= Assembly properties ================= */
+
+function fmtRange(r: Range, unit: string): string {
+  const lo = r.min === null ? '−∞' : formatNum(r.min);
+  const hi = r.max === null ? '∞' : formatNum(r.max);
+  return `${lo} … ${hi} ${unit}`;
+}
+
+/** Small text input that commits its value on blur / Enter. */
+function TextEdit({ label, value, onCommit }: { label: string; value: string; onCommit: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  return (
+    <div className="field">
+      <span className="flabel">{label}</span>
+      <input
+        value={text}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          const t = text.trim();
+          if (t && t !== value) onCommit(t);
+          else setText(value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') setText(value);
+        }}
+      />
+    </div>
+  );
+}
+
+function Vec3Fields({ label, value, onChange }: { label: string; value: Vec3; onChange: (v: Vec3) => void }) {
+  return (
+    <>
+      <div className="props-sub">{label}</div>
+      <div className="field-row">
+        <NumInput label="X" value={value[0]} onCommit={(x) => onChange([x, value[1], value[2]])} />
+        <NumInput label="Y" value={value[1]} onCommit={(y) => onChange([value[0], y, value[2]])} />
+        <NumInput label="Z" value={value[2]} onCommit={(z) => onChange([value[0], value[1], z])} />
+      </div>
+    </>
+  );
+}
+
+function JointEditor({
+  joint,
+  params,
+  jointValue,
+  joints,
+  links,
+}: {
+  joint: Joint;
+  params: Params;
+  jointValue: number;
+  joints: Joint[];
+  links: Link[];
+}) {
+  const update = (fn: (j: Joint) => Joint) => useStore.getState().updateJoint(joint.id, fn);
+  const drive = (v: number) => useStore.getState().setJointValue(joint.id, v);
+  const evalNum = (e: string) => tryEval(e, params);
+  const unit = joint.type === 'revolute' ? '°' : 'mm';
+  const range = resolvedRange(joint.id, joints, links, evalNum);
+  const isFree = range.min === null && range.max === null;
+  const lo = range.min ?? (joint.type === 'revolute' ? -180 : -100);
+  const hi = range.max ?? (joint.type === 'revolute' ? 180 : 100);
+  const sliderStep = (hi - lo) / 200 || 1;
+  const clamped = Math.min(hi, Math.max(lo, jointValue));
+
+  // Step size for the « / » buttons: default to ¼ of the allowed range, or 90°
+  // (revolute) / 10 mm (prismatic) when the range is unbounded. Component is
+  // keyed by joint id, so this initialises fresh per joint.
+  const defaultStep =
+    range.min !== null && range.max !== null && range.max > range.min
+      ? +((range.max - range.min) / 4).toFixed(4)
+      : joint.type === 'revolute'
+      ? 90
+      : 10;
+  const [step, setStep] = useState(defaultStep);
+
+  // Free revolute joints wrap past ±180° back to the negative side; everything
+  // else relies on setJointValue's clamp to the resolved range.
+  const applyStep = (delta: number) => {
+    let next = jointValue + delta;
+    if (isFree && joint.type === 'revolute') {
+      next = ((next + 180) % 360 + 360) % 360 - 180;
+    }
+    drive(next);
+  };
+
+  return (
+    <div className="assembly-editor" style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }}>
+      <TextEdit label="Name" value={joint.name} onCommit={(v) => update((j) => ({ ...j, name: v }))} />
+      <div className="field">
+        <span className="flabel">Type</span>
+        <select value={joint.type} onChange={(e) => update((j) => ({ ...j, type: e.target.value as JointType }))}>
+          <option value="revolute">Revolute (rotate)</option>
+          <option value="prismatic">Prismatic (slide)</option>
+        </select>
+      </div>
+      <Vec3Fields label="Origin" value={joint.origin} onChange={(v) => update((j) => ({ ...j, origin: v }))} />
+      <Vec3Fields
+        label={joint.type === 'revolute' ? 'Axis (rotation)' : 'Axis (slide direction)'}
+        value={joint.axis}
+        onChange={(v) => update((j) => ({ ...j, axis: v }))}
+      />
+      <div className="props-sub">Limits</div>
+      <div className="field">
+        <span className="flabel">Range</span>
+        <select
+          value={joint.limits.mode}
+          onChange={(e) =>
+            update((j) => ({ ...j, limits: { ...j.limits, mode: e.target.value as 'free' | 'limited' } }))
+          }
+        >
+          <option value="free">Free</option>
+          <option value="limited">Limited</option>
+        </select>
+      </div>
+      {joint.limits.mode === 'limited' && (
+        <div className="field-row">
+          <ExprInput
+            label={`Min ${unit}`}
+            value={joint.limits.min ?? '0'}
+            params={params}
+            onCommit={(v) => update((j) => ({ ...j, limits: { ...j.limits, min: v } }))}
+          />
+          <ExprInput
+            label={`Max ${unit}`}
+            value={joint.limits.max ?? '0'}
+            params={params}
+            onCommit={(v) => update((j) => ({ ...j, limits: { ...j.limits, max: v } }))}
+          />
+        </div>
+      )}
+      <div className="props-sub">Drive</div>
+      <div className="hint">Resolved range: {fmtRange(range, unit)}</div>
+      <input
+        type="range"
+        min={lo}
+        max={hi}
+        step={sliderStep}
+        value={clamped}
+        onChange={(e) => drive(parseFloat(e.target.value))}
+        style={{ width: '100%' }}
+      />
+      <div className="field-row" style={{ gap: 4, marginTop: 2 }}>
+        <button
+          className="link-btn"
+          title={`Step back ${step}${unit}`}
+          style={{ flex: 1 }}
+          onClick={() => applyStep(-step)}
+        >
+          «
+        </button>
+        <button className="link-btn" title="Reset to design position" style={{ flex: 1 }} onClick={() => drive(0)}>
+          0{unit}
+        </button>
+        <button
+          className="link-btn"
+          title={`Step forward ${step}${unit}`}
+          style={{ flex: 1 }}
+          onClick={() => applyStep(step)}
+        >
+          »
+        </button>
+      </div>
+      <NumInput label={`Value ${unit}`} value={Math.round(jointValue * 100) / 100} onCommit={(v) => drive(v)} />
+      <NumInput label={`Step ${unit}`} value={step} onCommit={(v) => setStep(v > 0 ? v : step)} />
+      <button className="link-btn" style={{ marginTop: 6 }} onClick={() => useStore.getState().removeJoint(joint.id)}>
+        Delete joint
+      </button>
+    </div>
+  );
+}
+
+function LinkEditor({ link, joints, params }: { link: Link; joints: Joint[]; params: Params }) {
+  const doc = useStore((s) => s.doc);
+  const update = (fn: (l: Link) => Link) => useStore.getState().updateLink(link.id, fn);
+  const driver = joints.find((j) => j.id === link.driverJointId);
+  const driven = joints.find((j) => j.id === link.drivenJointId);
+  const kindFor = (a?: Joint, b?: Joint): Link['kind'] => (a && b ? linkKind(a, b) : link.kind);
+
+  const driverTeeth = driver ? cogTeethForFeature(doc, driver.featureId) : undefined;
+  const drivenTeeth = driven ? cogTeethForFeature(doc, driven.featureId) : undefined;
+  const canDerive = driverTeeth != null && drivenTeeth != null;
+  const kind = kindFor(driver, driven);
+  const unitHint =
+    kind === 'rot-rot'
+      ? 'driven° = ratio × driver°'
+      : kind === 'lin-lin'
+      ? 'driven mm = ratio × driver mm'
+      : 'rotation ↔ linear: ratio is mm per ° (driven slide) or ° per mm — match it to your driver';
+
+  return (
+    <div className="assembly-editor" style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }}>
+      <TextEdit label="Name" value={link.name} onCommit={(v) => update((l) => ({ ...l, name: v }))} />
+      <div className="field">
+        <span className="flabel">Driver</span>
+        <select
+          value={link.driverJointId}
+          onChange={(e) => {
+            const nv = e.target.value;
+            update((l) => ({
+              ...l,
+              driverJointId: nv,
+              kind: kindFor(joints.find((j) => j.id === nv), joints.find((j) => j.id === l.drivenJointId)),
+            }));
+          }}
+        >
+          {joints.map((j) => (
+            <option key={j.id} value={j.id}>
+              {j.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <span className="flabel">Driven</span>
+        <select
+          value={link.drivenJointId}
+          onChange={(e) => {
+            const nv = e.target.value;
+            update((l) => ({
+              ...l,
+              drivenJointId: nv,
+              kind: kindFor(joints.find((j) => j.id === l.driverJointId), joints.find((j) => j.id === nv)),
+            }));
+          }}
+        >
+          {joints
+            .filter((j) => j.id !== link.driverJointId)
+            .map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.name}
+              </option>
+            ))}
+        </select>
+      </div>
+      <ExprInput
+        label="Ratio"
+        value={link.ratio}
+        params={params}
+        onCommit={(v) => update((l) => ({ ...l, ratio: v, ratioSource: 'manual' }))}
+      />
+      {canDerive && (
+        <button
+          className="link-btn"
+          onClick={() => {
+            const r = teethRatio(driverTeeth, drivenTeeth);
+            if (r !== null) update((l) => ({ ...l, ratio: String(+r.toFixed(4)), ratioSource: 'teeth' }));
+          }}
+        >
+          Derive ratio from teeth ({driverTeeth}/{drivenTeeth})
+        </button>
+      )}
+      <ExprInput
+        label="Phase"
+        value={link.phase ?? '0'}
+        params={params}
+        onCommit={(v) => update((l) => ({ ...l, phase: v }))}
+      />
+      <div className="hint">
+        {link.ratioSource === 'teeth' ? 'Ratio auto-derived from tooth counts. ' : ''}
+        {unitHint}
+      </div>
+      <button className="link-btn" style={{ marginTop: 6 }} onClick={() => useStore.getState().removeLink(link.id)}>
+        Delete link
+      </button>
+    </div>
+  );
+}
+
+const assemblyRowStyle = (sel: boolean): CSSProperties => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 8,
+  width: '100%',
+  padding: '4px 6px',
+  border: '1px solid var(--border)',
+  borderRadius: 4,
+  marginBottom: 3,
+  background: sel ? 'var(--accent)' : 'transparent',
+  color: sel ? '#fff' : 'inherit',
+  cursor: 'pointer',
+  textAlign: 'left',
+});
+
+export function AssemblyWarnings() {
+  const warnings = useStore((s) => s.assembly.warnings);
+  if (warnings.length === 0) return null;
+  return (
+    <div
+      className="hint"
+      style={{ color: '#e6a23c', border: '1px solid #e6a23c55', borderRadius: 4, padding: 6, marginBottom: 8 }}
+    >
+      ⚠ {warnings.join(' ')}
+    </div>
+  );
+}
+
+/** Joints list + selected-joint editor. Used by the Joints document tab and the
+ *  combined fallback panel. */
+export function AssemblyJointsSection({ params }: { params: Params }) {
+  const doc = useStore((s) => s.doc);
+  const joints = doc.joints;
+  const links = doc.links;
+  const selectedJointId = useStore((s) => s.assembly.selectedJointId);
+  const jointValues = useStore((s) => s.assembly.jointValues);
+  const selectJoint = useStore((s) => s.selectJoint);
+  const bodyName = (fid: string) => doc.features.find((f) => f.id === fid)?.name ?? '(deleted)';
+  const selJoint = joints.find((j) => j.id === selectedJointId) ?? null;
+
+  return (
+    <>
+      <div className="props-sub">Joints</div>
+      {joints.length === 0 && (
+        <div className="empty-note">
+          No joints yet. Click a body in the viewport, then add a Revolute or Prismatic joint from the toolbar.
+        </div>
+      )}
+      {joints.map((j) => (
+        <button key={j.id} style={assemblyRowStyle(j.id === selectedJointId)} onClick={() => selectJoint(j.id)}>
+          <span>{j.name}</span>
+          <span style={{ opacity: 0.75, fontSize: 12 }}>
+            {j.type === 'revolute' ? '⟳' : '↔'} {bodyName(j.featureId)}
+          </span>
+        </button>
+      ))}
+      {selJoint && (
+        <JointEditor
+          key={selJoint.id}
+          joint={selJoint}
+          params={params}
+          jointValue={jointValues[selJoint.id] ?? 0}
+          joints={joints}
+          links={links}
+        />
+      )}
+    </>
+  );
+}
+
+/** Links list + selected-link editor. Used by the Links document tab and the
+ *  combined fallback panel. */
+export function AssemblyLinksSection({ params }: { params: Params }) {
+  const doc = useStore((s) => s.doc);
+  const joints = doc.joints;
+  const links = doc.links;
+  const selectedLinkId = useStore((s) => s.assembly.selectedLinkId);
+  const selectLink = useStore((s) => s.selectLink);
+  const selLink = links.find((l) => l.id === selectedLinkId) ?? null;
+
+  return (
+    <>
+      <div className="props-sub">Links</div>
+      {joints.length < 2 ? (
+        <div className="empty-note">Add at least two joints to link them, then use Link in the toolbar.</div>
+      ) : (
+        links.length === 0 && <div className="empty-note">No links yet. Use Link in the toolbar to couple two joints.</div>
+      )}
+      {links.map((l) => {
+        const dr = joints.find((j) => j.id === l.driverJointId)?.name ?? '?';
+        const dn = joints.find((j) => j.id === l.drivenJointId)?.name ?? '?';
+        return (
+          <button key={l.id} style={assemblyRowStyle(l.id === selectedLinkId)} onClick={() => selectLink(l.id)}>
+            <span>{l.name}</span>
+            <span style={{ opacity: 0.75, fontSize: 12 }}>
+              {dr} → {dn} ×{l.ratio}
+            </span>
+          </button>
+        );
+      })}
+      {selLink && <LinkEditor key={selLink.id} link={selLink} joints={joints} params={params} />}
+    </>
+  );
+}
+
+/** Combined fallback (used only when the Joints/Links document tabs aren't
+ *  present, e.g. a layout saved before they existed). */
+function AssemblyProps({ params }: { params: Params }) {
+  return (
+    <>
+      <div className="props-title">ASSEMBLY</div>
+      <div className="hint" style={{ marginBottom: 8 }}>
+        Non-permanent: leaving Assembly mode returns every body to its design position.
+      </div>
+      <AssemblyWarnings />
+      <AssemblyJointsSection params={params} />
+      <div style={{ marginTop: 12 }} />
+      <AssemblyLinksSection params={params} />
     </>
   );
 }

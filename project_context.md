@@ -139,6 +139,42 @@ toolbar. Prototype stage.
 - **Undo / redo**: 50-step stack; `Ctrl-Z` / `Ctrl-Shift-Z` / `Ctrl-Y`.
 - **Validation**: duplicate-name checks, delete confirmation with dependent
   lists, ⚠ icons on features with errors.
+- **Assembly mode** (third mode beside model & sketch — see
+  `assembly_mode_design_guide.md` for the full design + as-built notes):
+  declare mechanical **joints** on bodies (Revolute = rotate about an axis
+  through an origin; Prismatic = slide along a vector) with free or limited
+  min/max, and **links** that couple two joints by a ratio + phase
+  (Rotation↔Rotation, Rotation↔Linear, Linear↔Linear). Cog-to-cog ratios
+  auto-derive from tooth counts (`N₁/N₂`, negative for external mesh). Enter via
+  the **Modify ▸ Assembly** toolbar button or the **Assembly** menu; the
+  `tb-assembly` block then shows Revolute / Prismatic / Link / Delete / Exit.
+  Pick a body (click it) and add a joint — its origin/axis are seeded from the
+  body's world bbox (centre + thinnest axis = a flat cog's spin axis) and edited
+  numerically in the panel. Drag the on-canvas handle (amber ring / arrow) to
+  drive a joint, or use the editor's slider with `«` / `0°` (reset) / `»` step
+  buttons and a **Step** field (defaults to ¼ of range, or 90°/10 mm when free;
+  free revolute wraps past ±180°). Values clamp to the resolved range
+  (own range ∩ each partner's range mapped through the ratio) and propagate
+  across links (undirected: forward by ratio, inverse the other way). Acyclic
+  driver→driven only — cycles are detected and warned (status bar + Joints tab),
+  never solved. **Non-destructive**: the model tree is frozen, geometry is baked
+  to world space so the home pose is the identity, motion is a transient overlay
+  (`assembly.jointValues`, not undoable, not serialised), and leaving the mode
+  snaps everything home. Joint/link *definitions* live on `Doc` (serialised,
+  undoable, dirty-flagging). The RHS **Info** tab is swapped for two **Joints**
+  and **Links** document tabs while assembling (non-closable, draggable so both
+  can be torn out side-by-side; torn containers `killOnClose` and the swap is
+  reconciled idempotently on mode change in `useStudioActions`); leaving
+  restores Info. New files: `studio/core/assembly.ts` (pure math) +
+  `assembly.test.ts` (17 Vitest cases, `npm test`), `components/panels/
+  JointsPanel.tsx` + `LinksPanel.tsx`; additive edits to `studio/types.ts`
+  (`Joint` / `Link` on `Doc`), `state/store.ts`, `studioBridge.tsx`,
+  `io/exporters.ts`, `Viewport.tsx`, `PropertiesPanel.tsx`,
+  `useStudioActions.ts`, `StudioStatusBar.tsx`, `DocumentPanel.tsx`
+  (COMPONENT_REGISTRY), the toolbar/menu/layout JSON (`tb-assembly`,
+  `menu-assembly`, `doc-joints` / `doc-links` in `default_layout.json`).
+  *Picking up the toolbar + tabs on an existing install needs one
+  View → Reset Workspace Layout (they're defined in `default_layout.json`).*
 
 ---
 
@@ -156,6 +192,7 @@ toolbar. Prototype stage.
 | three-mesh-bvh | ^0.9 | BVH acceleration (peer of above) |
 | zustand | ^5 | Modelling state management |
 | occt-import-js | ^0.0.23 | OpenCascade WASM for STEP import (lazy-loaded) |
+| vitest | ^4 | Unit tests (dev-only) — `npm test` |
 
 **Commands** (run inside `frontend/`):
 
@@ -164,6 +201,7 @@ npm install
 npm run dev        # vite dev server
 npm run build      # tsc && vite build
 npx tsc --noEmit   # type-check only
+npm test           # vitest run — currently the assembly-math suite (core/assembly.test.ts)
 ```
 
 > Sandbox note: if the `dist` folder has ownership issues, build with
@@ -201,11 +239,12 @@ Parametric3dStudio/
                                 FloatingPanel(Manager), ModalDialog, StatusBar, DummyPanel)
         StudioStatusBar.tsx   ← APP-LAYER replacement for framework StatusBar
                                  (hint + errors + cursor + grid / snap controls)
-        panels/               ← APP PANELS: FeaturesPanel, CanvasPanel, InfoPanel
+        panels/               ← APP PANELS: FeaturesPanel, CanvasPanel, InfoPanel,
+                                 JointsPanel, LinksPanel (Assembly-mode tabs)
       studio/                 ← VENDORED modelling engine; small additive edits
                                  logged in framework_changes.md when needed
         types.ts  occt-import-js.d.ts  studio.css
-        core/     expressions.ts, sketchGeometry.ts, buildGeometry.ts
+        core/     expressions.ts, sketchGeometry.ts, buildGeometry.ts, assembly.ts (+ assembly.test.ts)
         io/       importers.ts, exporters.ts
         state/    store.ts (Zustand)
         components/ App.tsx*, Toolbar.tsx*, SidePanel.tsx, PropertiesPanel.tsx,
@@ -225,19 +264,27 @@ are made directly — wrap or extend from the bridge / panel layer otherwise.
 
 ## 4. MDI integration architecture
 
-### 4.1 Three document panels (`components/DocumentPanel.tsx` registry)
+### 4.1 Document panels (`components/DocumentPanel.tsx` registry)
 
 | componentType | Wraps | Tab / title | Notes |
 |---|---|---|---|
 | `FeaturesPanel` | studio `SidePanel` | `Features` | Features + Parameters tabs; SVG eye-open / closed-eye / × glyphs sized 22×22 |
 | `CanvasPanel` | studio `Viewport` + `StudioFileInputs` | `Canvas` | 3D view + hidden file inputs (no per-panel status strip — see §4.4) |
 | `InfoPanel` | studio `PropertiesPanel` | `Info` | Context-sensitive properties + Measurement readout + Dimension editor |
+| `JointsPanel` | `AssemblyJointsSection` (in PropertiesPanel) | `Joints` | Assembly-mode tab — joints list + selected-joint editor + warnings |
+| `LinksPanel` | `AssemblyLinksSection` (in PropertiesPanel) | `Links` | Assembly-mode tab — links list + selected-link editor |
 
 Each app panel receives `{ doc, container }` (ignored) and pulls live data from
 `useRegen()`. Default layout: top row split **Features 22% · Canvas 56% · Info
 22%**; bottom row `visible: false` (no Output / dummy doc — both removed from
 the default layout JSON). All defined in
 `public/data/layout/default_layout.json` (`appId: "parametric3dstudio-v-0-1"`).
+The `Joints` / `Links` documents (`doc-joints-001` / `doc-links-001`) are
+defined closed in that layout and live in the `dc-info` container (which now has
+`allowTabs: true`); `useStudioActions` opens them and closes `Info` on entering
+Assembly mode, and reverses it on exit. They are non-closable + draggable
+(`allowAsTab: true`), with `defaultContainerOptions.killOnClose` so a torn-off
+container is removed when the mode exits.
 
 ### 4.2 The bridge (`studio/studioBridge.tsx`)
 
@@ -340,7 +387,10 @@ mode:
   the Custom submenu hosts parametric shapes.
 - **Sketch menu**: `sk-top` / `sk-front` / `sk-right` / `sk-face` get
   `disabled: true` while a sketch is open (no nested sketches); `sk-finish`
-  gets `disabled: true` in model mode (nothing to finish).
+  gets `disabled: true` in model mode (nothing to finish). `menu-create` /
+  `menu-sketch` are disabled wholesale while in **assembly** mode (frozen tree).
+- **Assembly menu** (`menu-assembly`): `as-enter` disabled while in assembly;
+  `as-exit` / `as-revolute` / `as-prismatic` / `as-link` disabled outside it.
 - **Window menu** is hidden by default (`visible: false` on `menu-window`) —
   no closable documents in the default layout, but easy to flip back on.
 
@@ -358,10 +408,11 @@ submenu`). Blocks are mode-swapped at runtime by `useStudioActions`:
 | `tb-edit` | toolbar_edit.json | always (left) | Undo, Redo |
 | `tb-sketch` | toolbar_sketch.json | model mode | Sketch ▾ (Top/Front/Right/On Face), Extrude |
 | `tb-create` | toolbar_create.json | model mode | Cube, Sphere, Cylinder, Cone, Torus · Import (STL) |
-| `tb-modify` | toolbar_modify.json | model mode | Move (4-way arrow), Rotate (CW curve), Merge (two-circles) |
+| `tb-modify` | toolbar_modify.json | model mode | Move (4-way arrow), Rotate (CW curve), Merge (two-circles), **Assembly** (enter) |
 | `tb-sketchtools` | toolbar_sketchtools.json | sketch mode | Select, Line, Rect, Circle, **Arc**, Fillet, Chamfer, Offset, Measure, Dimension · Construction · Image · Extrude, Finish |
 | `tb-extrude` | toolbar_extrude.json | sketch + face-pick (center) | Accept Extrude, Cancel |
 | `tb-merge` | toolbar_merge.json | model + merge-pick (center) | Cut A−B, Cut B−A, Fuse, Intersect, Cancel |
+| `tb-assembly` | toolbar_assembly.json | assembly mode | Revolute Joint, Prismatic Joint, Link · Delete · Exit Assembly |
 | `tb-view` | toolbar_view.json | hidden (`visible: false`) | Theme, Status Bar, Reset Layout |
 
 Icons are inline SVG strings (see §7 for `IconNode` support) — Move, Rotate,
@@ -373,10 +424,11 @@ Chamfer) where they read clearly.
 
 Visibility rules in the bridge:
 
-- model & not merging → show `tb-sketch` / `tb-create` / `tb-modify`
+- model & not merging & not assembling → show `tb-sketch` / `tb-create` / `tb-modify`
 - model & merge-pick → hide those, show `tb-merge`
 - sketch & not face-picking → show `tb-sketchtools`
 - sketch & face-pick → hide it, show `tb-extrude`
+- assembly → hide model/sketch blocks, show `tb-assembly`
 
 The menu bar (`public/data/menus/main_menu.json`) mirrors the actions:
 
@@ -391,6 +443,9 @@ The menu bar (`public/data/menus/main_menu.json`) mirrors the actions:
   five always-available primitives)
 - **Sketch**: Top / Front / Right / On Face · Finish Sketch (axis & face are
   disabled while in sketch mode; Finish is disabled in model mode)
+- **Assembly**: Enter / Exit Assembly Mode · Add Revolute Joint, Add Prismatic
+  Joint, Add Link (Enter disabled in assembly; the rest disabled outside it —
+  see §4.5)
 - **View**: Toggle Light / Dark (Ctrl+Shift+T globally registered) · Reset
   Workspace Layout
 - **Window**: hidden by default (toggle `visible: true` in the JSON when

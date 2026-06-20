@@ -6,16 +6,22 @@
  *
  * Called once from App.tsx's AppInner (inside the AppStateProvider).
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppState } from '../contexts/AppStateContext';
+import type { RowId } from '../types';
 import { actionRegistry } from '../utils/actionRegistry';
 import { confirmDeleteFeature, useStore } from './state/store';
 import {
   acceptExtrude,
+  addJointCmd,
+  addLinkCmd,
   addPrimitive,
   cancelFacePick,
   cancelMerge,
   createMerge,
+  deleteAssemblyCmd,
+  enterAssemblyCmd,
+  exitAssemblyCmd,
   exportStlCmd,
   fileTriggers,
   finishSketch,
@@ -37,8 +43,16 @@ import {
 const MODEL_BLOCKS = ['tb-sketch', 'tb-create', 'tb-modify'];
 const SKETCH_BLOCKS = ['tb-sketchtools'];
 
+// RHS document instance ids (see default_layout.json).
+const DC_INFO = 'dc-info-001';
+const DOC_INFO = 'doc-info-001';
+const DOC_JOINTS = 'doc-joints-001';
+const DOC_LINKS = 'doc-links-001';
+
 export function useStudioActions() {
-  const { dispatch } = useAppState();
+  const { state, dispatch } = useAppState();
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // ── Register commands (once) ─────────────────────────────────────────────
   useEffect(() => {
@@ -112,6 +126,14 @@ export function useStudioActions() {
       'studio:construction': () => toggleConstruction(),
       'studio:image': () => fileTriggers.pickImage?.(),
       'studio:finish': () => finishSketch(),
+
+      // Assembly mode
+      'studio:assembly:enter': () => enterAssemblyCmd(),
+      'studio:assembly:exit': () => exitAssemblyCmd(),
+      'studio:assembly:revolute': () => addJointCmd('revolute'),
+      'studio:assembly:prismatic': () => addJointCmd('prismatic'),
+      'studio:assembly:link': () => addLinkCmd(),
+      'studio:assembly:delete': () => deleteAssemblyCmd(),
     };
 
     for (const [name, fn] of Object.entries(reg)) actionRegistry.register(name, fn);
@@ -128,17 +150,68 @@ export function useStudioActions() {
   const inMergePick = useStore((s) => s.mergePick !== null);
   useEffect(() => {
     const sketching = mode === 'sketch';
+    const assembling = mode === 'assembly';
     const set = (id: string, visible: boolean) =>
       dispatch({ type: 'SET_TOOLBAR_BLOCK_VISIBLE', blockId: id, visible });
 
-    // Model tool blocks: visible in model mode when not choosing a merge target.
-    for (const id of MODEL_BLOCKS) set(id, !sketching && !inMergePick);
+    // Model tool blocks: visible in model mode when not choosing a merge target
+    // and not assembling.
+    for (const id of MODEL_BLOCKS) set(id, !sketching && !assembling && !inMergePick);
     // Sketch tool block: visible in sketch mode when not picking extrude faces.
     for (const id of SKETCH_BLOCKS) set(id, sketching && !inFacePick);
     // Transient bars.
     set('tb-extrude', sketching && inFacePick);
     set('tb-merge', !sketching && inMergePick);
+    // Assembly tool block.
+    set('tb-assembly', assembling);
   }, [mode, inFacePick, inMergePick, dispatch]);
+
+  // ── RHS panel swap: Info ⇄ Joints/Links document tabs ────────────────────
+  // In assembly mode the Info tab is replaced by two non-closable, non-draggable
+  // document tabs (Joints, Links); leaving assembly restores the Info tab.
+  // Reconciles idempotently on every mode change (and on mount), so a layout
+  // persisted mid-assembly is corrected on the next load. If the tab documents
+  // aren't present (e.g. an older saved layout), this is a no-op and the Info
+  // panel keeps showing the combined assembly editor as a fallback.
+  useEffect(() => {
+    const st = stateRef.current;
+    const docs = st.documents;
+    if (!docs[DOC_JOINTS] || !docs[DOC_LINKS] || !docs[DOC_INFO]) return;
+    const isOpen = (id: string) => !!docs[id]?.visible;
+    const locate = (docId: string): { containerInstanceId: string; rowId: RowId; containerIndex: number } | null => {
+      for (const rowId of ['row-top', 'row-bottom'] as RowId[]) {
+        const row = rowId === 'row-top' ? st.mdi.topRow : st.mdi.bottomRow;
+        const idx = row.containers.findIndex((c) => c.documentIds.includes(docId));
+        if (idx >= 0) return { containerInstanceId: row.containers[idx].instanceId, rowId, containerIndex: idx };
+      }
+      return null;
+    };
+    const close = (id: string) => {
+      const loc = locate(id);
+      if (loc) dispatch({ type: 'CLOSE_DOCUMENT', docInstanceId: id, ...loc });
+    };
+
+    if (mode === 'assembly') {
+      if (!isOpen(DOC_JOINTS)) dispatch({ type: 'RESTORE_DOCUMENT', docInstanceId: DOC_JOINTS });
+      if (!isOpen(DOC_LINKS)) dispatch({ type: 'RESTORE_DOCUMENT', docInstanceId: DOC_LINKS });
+      if (isOpen(DOC_INFO)) close(DOC_INFO);
+      dispatch({ type: 'SET_ACTIVE_DOCUMENT', containerInstanceId: DC_INFO, docInstanceId: DOC_JOINTS });
+    } else {
+      if (!isOpen(DOC_INFO)) dispatch({ type: 'RESTORE_DOCUMENT', docInstanceId: DOC_INFO });
+      if (isOpen(DOC_JOINTS)) close(DOC_JOINTS);
+      if (isOpen(DOC_LINKS)) close(DOC_LINKS);
+      dispatch({ type: 'SET_ACTIVE_DOCUMENT', containerInstanceId: DC_INFO, docInstanceId: DOC_INFO });
+      // If a Joints/Links tab was torn into the (normally hidden) bottom row,
+      // its container is killed when the doc closes above — hide the row too so
+      // we don't leave an empty row behind on exit.
+      const liveBottom = st.mdi.bottomRow.containers.filter((c) => c.visible && !c.killed);
+      const onlyAssemblyTabs =
+        liveBottom.length > 0 &&
+        liveBottom.every((c) => c.documentIds.every((id) => id === DOC_JOINTS || id === DOC_LINKS));
+      if (onlyAssemblyTabs) dispatch({ type: 'SET_ROW_VISIBLE', rowId: 'row-bottom', visible: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   // ── Toolbar "selected tool" highlight ────────────────────────────────────
   // Mirrors the current sketch tool + construction toggle into data attributes

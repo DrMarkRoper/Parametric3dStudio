@@ -11,8 +11,10 @@
  * from the original project — this layer wraps them.
  */
 import { useRef } from 'react';
+import * as THREE from 'three';
 import { regenerate } from './core/buildGeometry';
 import { importCache, nextName, useStore, type PendingImage, type ProjectMeta } from './state/store';
+import { linkKind, teethRatio } from './core/assembly';
 import * as dialogService from '../utils/dialogService';
 import { actionRegistry } from '../utils/actionRegistry';
 import {
@@ -23,11 +25,15 @@ import {
   type Doc,
   type ExtrudeFeature,
   type ImportFeature,
+  type Joint,
+  type JointType,
+  type Link,
   type MergeOp,
   type PlaneId,
   type PrimitiveFeature,
   type PrimitiveShape,
   type SketchFeature,
+  type Vec3,
 } from './types';
 import { exportSTL, loadProject, saveProject } from './io/exporters';
 import { IMPORT_EXTENSIONS, importModelFile } from './io/importers';
@@ -359,6 +365,118 @@ export function exportStlCmd() {
   } catch (e) {
     alert(e instanceof Error ? e.message : String(e));
   }
+}
+
+// ── Assembly mode ──────────────────────────────────────────────────────────
+
+/** Sequential "Joint 1" / "Link 1" naming, scoped to joints / links. */
+function nextAssemblyName(existing: { name: string }[], prefix: string): string {
+  let n = 1;
+  const names = new Set(existing.map((e) => e.name));
+  while (names.has(`${prefix} ${n}`)) n++;
+  return `${prefix} ${n}`;
+}
+
+/** World-space bounding box of a body (across all its BodyOut pieces). Returns
+ *  the centre and the body's thinnest principal direction — a good default
+ *  revolute axis for a flat disc / cog (its spin axis). */
+function bodyBox(featureId: string): { center: Vec3; thinAxis: Vec3 } | null {
+  const bodies = _regen?.bodies ?? [];
+  const pieces = bodies.filter((b) => b.featureId === featureId);
+  if (!pieces.length) return null;
+  const box = new THREE.Box3();
+  for (const b of pieces) {
+    b.geometry.computeBoundingBox();
+    if (b.geometry.boundingBox) box.union(b.geometry.boundingBox);
+  }
+  if (box.isEmpty()) return null;
+  const c = box.getCenter(new THREE.Vector3());
+  const sz = box.getSize(new THREE.Vector3());
+  const thinAxis: Vec3 =
+    sz.x <= sz.y && sz.x <= sz.z ? [1, 0, 0] : sz.y <= sz.z ? [0, 1, 0] : [0, 0, 1];
+  return { center: [c.x, c.y, c.z], thinAxis };
+}
+
+/** Tooth count of the cog that produced a body (extrude → sketch → cog), if any. */
+export function cogTeethForFeature(doc: Doc, featureId: string): number | undefined {
+  const f = doc.features.find((x) => x.id === featureId);
+  if (!f || f.type !== 'extrude') return undefined;
+  const sk = doc.features.find((x) => x.id === f.sketchId);
+  if (!sk || sk.type !== 'sketch') return undefined;
+  const cog = sk.entities.find((e) => e.kind === 'cog');
+  return cog && cog.kind === 'cog' ? cog.teeth : undefined;
+}
+
+export function enterAssemblyCmd() {
+  resetToModelMode();
+  useStore.getState().enterAssembly();
+}
+
+export function exitAssemblyCmd() {
+  useStore.getState().exitAssembly();
+}
+
+export function addJointCmd(type: JointType) {
+  const s = useStore.getState();
+  if (s.mode !== 'assembly') s.enterAssembly();
+  const sel = useStore.getState().doc.features.find((f) => f.id === s.selectedFeatureId);
+  if (!sel || sel.type === 'sketch') {
+    dialogService.showAlert({
+      title: 'Add Joint',
+      message: 'Select a body first (click it in the viewport), then add a joint.',
+      mode: 'warning',
+    });
+    return;
+  }
+  const box = bodyBox(sel.id);
+  const origin: Vec3 = box?.center ?? [0, 0, 0];
+  const axis: Vec3 = type === 'revolute' ? box?.thinAxis ?? [0, 1, 0] : [1, 0, 0];
+  const j: Joint = {
+    id: uid(),
+    name: nextAssemblyName(useStore.getState().doc.joints, 'Joint'),
+    featureId: sel.id,
+    type,
+    origin,
+    axis,
+    limits: { mode: 'free' },
+  };
+  useStore.getState().addJoint(j);
+}
+
+export function addLinkCmd() {
+  const s = useStore.getState();
+  const joints = s.doc.joints;
+  if (joints.length < 2) {
+    dialogService.showAlert({
+      title: 'Add Link',
+      message: 'Add at least two joints before linking them.',
+      mode: 'warning',
+    });
+    return;
+  }
+  const driverId = s.assembly.selectedJointId ?? joints[0].id;
+  const driver = joints.find((j) => j.id === driverId) ?? joints[0];
+  const driven = joints.find((j) => j.id !== driver.id)!;
+  // Auto-derive the ratio from tooth counts when both bodies are cogs.
+  const ratioNum = teethRatio(cogTeethForFeature(s.doc, driver.featureId), cogTeethForFeature(s.doc, driven.featureId));
+  const l: Link = {
+    id: uid(),
+    name: nextAssemblyName(s.doc.links, 'Link'),
+    driverJointId: driver.id,
+    drivenJointId: driven.id,
+    kind: linkKind(driver, driven),
+    ratio: ratioNum !== null ? String(+ratioNum.toFixed(4)) : '1',
+    ratioSource: ratioNum !== null ? 'teeth' : 'manual',
+    phase: '0',
+  };
+  useStore.getState().addLink(l);
+}
+
+/** Delete the currently selected joint or link in Assembly mode. */
+export function deleteAssemblyCmd() {
+  const s = useStore.getState();
+  if (s.assembly.selectedLinkId) s.removeLink(s.assembly.selectedLinkId);
+  else if (s.assembly.selectedJointId) s.removeJoint(s.assembly.selectedJointId);
 }
 
 // ── Hidden file inputs ─────────────────────────────────────────────────────

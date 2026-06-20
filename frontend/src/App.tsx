@@ -580,14 +580,18 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
   const mode = useStore((s) => s.mode);
   return useMemo<MenuRootItem[]>(() => {
     const inSketch = mode === 'sketch';
+    const inAssembly = mode === 'assembly';
     return baseMenu.map((root): MenuRootItem => {
       if (root.id === 'menu-create') {
-        // Swap the Create menu's contents wholesale while sketching.
-        return inSketch ? { ...root, children: SKETCH_MENU_CHILDREN } : root;
+        // Swap the Create menu's contents wholesale while sketching; disable it
+        // entirely while assembling (the model tree is frozen).
+        if (inSketch) return { ...root, children: SKETCH_MENU_CHILDREN };
+        return { ...root, disabled: inAssembly };
       }
       if (root.id === 'menu-sketch') {
         return {
           ...root,
+          disabled: inAssembly,
           children: root.children.map((c): MenuItem => {
             // Block creating another sketch while one is already open.
             if (['sk-top', 'sk-front', 'sk-right', 'sk-face'].includes(c.id)) {
@@ -595,6 +599,19 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
             }
             // Finish Sketch only makes sense while in sketch mode.
             if (c.id === 'sk-finish') return { ...c, disabled: !inSketch };
+            return c;
+          }),
+        };
+      }
+      if (root.id === 'menu-assembly') {
+        return {
+          ...root,
+          children: root.children.map((c): MenuItem => {
+            // Enter only outside assembly; everything else only inside it.
+            if (c.id === 'as-enter') return { ...c, disabled: inAssembly };
+            if (['as-exit', 'as-revolute', 'as-prismatic', 'as-link'].includes(c.id)) {
+              return { ...c, disabled: !inAssembly };
+            }
             return c;
           }),
         };

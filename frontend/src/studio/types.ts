@@ -295,6 +295,64 @@ export interface BooleanFeature extends FeatureBase {
 
 export type Feature = SketchFeature | ExtrudeFeature | PrimitiveFeature | ImportFeature | BooleanFeature;
 
+/* ---------- Assembly (mechanical joints & links) ---------- */
+
+/** A 3D point / vector in world space (baked, like all engine geometry). */
+export type Vec3 = [number, number, number];
+
+export type JointType = 'revolute' | 'prismatic';
+
+/** Allowed-motion limits for a joint. `free` = unbounded; `limited` reads min/max. */
+export interface JointLimits {
+  mode: 'free' | 'limited';
+  /** Expression; degrees (revolute) or length units (prismatic). */
+  min?: string;
+  /** Expression; only read when mode === 'limited'. */
+  max?: string;
+}
+
+/**
+ * A single retained degree of freedom for one body, relative to its design
+ * (home) pose. Revolute = rotation about `axis` through `origin`; prismatic =
+ * translation along `axis` from `origin`. `axis` is stored normalised and its
+ * orientation defines the positive direction (right-hand rule for revolute).
+ * The current drive value is transient UI state (store.assembly.jointValues),
+ * never serialised — the home pose is always the zero.
+ */
+export interface Joint {
+  id: string;
+  name: string;
+  /** Feature id of the body this joint moves. */
+  featureId: string;
+  type: JointType;
+  /** Joint origin in world space. */
+  origin: Vec3;
+  /** Revolute: rotation axis. Prismatic: translation direction. Normalised. */
+  axis: Vec3;
+  limits: JointLimits;
+}
+
+/** The coupling type, derived from the two joints' types. */
+export type LinkKind = 'rot-rot' | 'rot-lin' | 'lin-lin';
+
+/**
+ * A coupling between two joints: `driven = ratio * driver + phase`. Acyclic
+ * driver→driven chains only (cycles are detected and warned, never solved).
+ */
+export interface Link {
+  id: string;
+  name: string;
+  driverJointId: string;
+  drivenJointId: string;
+  kind: LinkKind;
+  /** Expression. driven value = ratio * driver value + phase. */
+  ratio: string;
+  /** Where the ratio comes from. `teeth` auto-derives from cog tooth counts. */
+  ratioSource: 'manual' | 'teeth';
+  /** Expression; offset added to the driven value after the ratio. Default 0. */
+  phase?: string;
+}
+
 /* ---------- Document ---------- */
 
 export interface Doc {
@@ -302,6 +360,10 @@ export interface Doc {
   features: Feature[];
   gridSize: number;
   snap: SnapMode;
+  /** Mechanical joints (Assembly mode). Optional for legacy files. */
+  joints: Joint[];
+  /** Mechanical links between joints (Assembly mode). Optional for legacy files. */
+  links: Link[];
 }
 
 export const emptyDoc = (): Doc => ({
@@ -309,6 +371,8 @@ export const emptyDoc = (): Doc => ({
   features: [],
   gridSize: 5,
   snap: 'grid',
+  joints: [],
+  links: [],
 });
 
 export const uid = (): string => Math.random().toString(36).slice(2, 10);

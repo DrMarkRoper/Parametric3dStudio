@@ -66,7 +66,7 @@
           "collapsed": false,
           "visible": true,
           "killed": false,
-          "allowTabs": false,
+          "allowTabs": true,
           "allowClose": false,
           "allowDragMove": true,
           "forbidDropBefore": false,
@@ -102,6 +102,7 @@
       "tb-sketchtools",
       "tb-extrude",
       "tb-merge",
+      "tb-assembly",
       "tb-view"
     ],
     "blocks": {
@@ -177,6 +178,15 @@
         "alignment": "center",
         "labelMode": "icon-title"
       },
+      "tb-assembly": {
+        "id": "tb-assembly",
+        "title": "Assembly",
+        "menuFile": "toolbar_assembly.json",
+        "visible": false,
+        "disabled": false,
+        "alignment": "left",
+        "labelMode": "icon-title"
+      },
       "tb-view": {
         "id": "tb-view",
         "title": "View",
@@ -245,6 +255,42 @@
       "toolbarMenus": [],
       "closedState": null,
       "defaultContainerOptions": null,
+      "floating": null,
+      "poppedOut": false
+    },
+    {
+      "id": "doc-joints",
+      "instanceId": "doc-joints-001",
+      "componentType": "JointsPanel",
+      "title": "Joints",
+      "tabTitle": "Joints",
+      "visible": false,
+      "allowClose": false,
+      "killOnClose": false,
+      "allowAsTab": true,
+      "restrictToTabTypes": ["info"],
+      "width": { "default": 300, "current": 300, "fixed": false },
+      "toolbarMenus": [],
+      "closedState": { "containerId": "dc-info-001", "rowId": "row-top", "containerIndex": 2 },
+      "defaultContainerOptions": { "allowTabs": true, "forceCloseOnEmpty": true, "killOnClose": true, "restrictTabToTypes": ["info"] },
+      "floating": null,
+      "poppedOut": false
+    },
+    {
+      "id": "doc-links",
+      "instanceId": "doc-links-001",
+      "componentType": "LinksPanel",
+      "title": "Links",
+      "tabTitle": "Links",
+      "visible": false,
+      "allowClose": false,
+      "killOnClose": false,
+      "allowAsTab": true,
+      "restrictToTabTypes": ["info"],
+      "width": { "default": 300, "current": 300, "fixed": false },
+      "toolbarMenus": [],
+      "closedState": { "containerId": "dc-info-001", "rowId": "row-top", "containerIndex": 2 },
+      "defaultContainerOptions": { "allowTabs": true, "forceCloseOnEmpty": true, "killOnClose": true, "restrictTabToTypes": ["info"] },
       "floating": null,
       "poppedOut": false
     }

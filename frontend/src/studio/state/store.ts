@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
-import { emptyDoc, uid, type Doc, type Feature, type Parameter, type SketchFeature, type SnapMode, type Vec2 } from '../types';
+import { emptyDoc, uid, type Doc, type Feature, type Joint, type Link, type Parameter, type SketchFeature, type SnapMode, type Vec2 } from '../types';
+import { cycleWarnings, propagate } from '../core/assembly';
+import { resolveParameters, tryEval } from '../core/expressions';
 
 export type Tool =
   | 'select'
@@ -53,7 +55,20 @@ export interface DynamicOp {
   /** rotate only: atan2 angle (°) at first mouse move after origin set. null until mouse moves. */
   firstAngle: number | null;
 }
-export type Mode = 'model' | 'sketch';
+export type Mode = 'model' | 'sketch' | 'assembly';
+
+/** Transient Assembly-mode state. Joint/link *definitions* live in the Doc
+ *  (serialised, undoable); these *values* and selections are transient and
+ *  reset to zero whenever the mode is entered or left, so posing a mechanism
+ *  never mutates the model. */
+export interface AssemblyState {
+  /** Current drive value per joint id (degrees or length). Zeroed on enter/exit. */
+  jointValues: Record<string, number>;
+  selectedJointId: string | null;
+  selectedLinkId: string | null;
+  /** Cycle / over-constraint warnings recomputed on link changes. */
+  warnings: string[];
+}
 
 export interface PendingImage {
   src: string;
@@ -112,6 +127,9 @@ interface State {
   /** Whether the doc has unsaved changes since the last save / load / new. */
   dirty: boolean;
 
+  /** Transient Assembly-mode drive values + selection + warnings. */
+  assembly: AssemblyState;
+
   setDoc: (doc: Doc, undoable?: boolean) => void;
   undo: () => void;
   redo: () => void;
@@ -152,6 +170,29 @@ interface State {
   setDynamicOp: (op: DynamicOp | null) => void;
   setMeasure: (m: MeasureState) => void;
   setDimensionDraft: (d: DimensionDraft) => void;
+
+  // ── Assembly mode ──────────────────────────────────────────────────────
+  /** Enter Assembly mode: freeze the model, zero all joint values. */
+  enterAssembly: () => void;
+  /** Leave Assembly mode: drop drive values so every body snaps home. */
+  exitAssembly: () => void;
+  addJoint: (j: Joint, select?: boolean) => void;
+  updateJoint: (id: string, fn: (j: Joint) => Joint) => void;
+  removeJoint: (id: string) => void;
+  addLink: (l: Link, select?: boolean) => void;
+  updateLink: (id: string, fn: (l: Link) => Link) => void;
+  removeLink: (id: string) => void;
+  selectJoint: (id: string | null) => void;
+  selectLink: (id: string | null) => void;
+  /** Drive a joint to `value`, clamped and propagated across links. */
+  setJointValue: (jointId: string, value: number) => void;
+}
+
+/** Build a number-evaluator over a doc's parameters (for joint limit / ratio
+ *  expressions). */
+function makeEvalNum(doc: Doc): (expr: string) => number | null {
+  const { values } = resolveParameters(doc.parameters);
+  return (expr: string) => tryEval(expr, values);
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -180,6 +221,8 @@ export const useStore = create<State>((set, get) => ({
 
   projectMeta: emptyProjectMeta(),
   dirty: false,
+
+  assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
 
   setDoc(doc, undoable = true) {
     set((s) => ({
@@ -231,6 +274,7 @@ export const useStore = create<State>((set, get) => ({
       dimPrompt: null,
       projectMeta: emptyProjectMeta(),
       dirty: false,
+      assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
     });
   },
 
@@ -260,7 +304,14 @@ export const useStore = create<State>((set, get) => ({
   deleteFeature(id) {
     const d = get().doc;
     const dead = collectDead(d, id);
-    get().setDoc({ ...d, features: d.features.filter((f) => !dead.has(f.id)) });
+    // Drop joints on any deleted body, and links referencing those joints.
+    const deadJoints = new Set(d.joints.filter((j) => dead.has(j.featureId)).map((j) => j.id));
+    get().setDoc({
+      ...d,
+      features: d.features.filter((f) => !dead.has(f.id)),
+      joints: d.joints.filter((j) => !deadJoints.has(j.id)),
+      links: d.links.filter((l) => !deadJoints.has(l.driverJointId) && !deadJoints.has(l.drivenJointId)),
+    });
     for (const k of dead) importCache.delete(k);
     set((s) => ({
       selectedFeatureId: s.selectedFeatureId && dead.has(s.selectedFeatureId) ? null : s.selectedFeatureId,
@@ -396,6 +447,118 @@ export const useStore = create<State>((set, get) => ({
   },
   setDimensionDraft(d) {
     set({ dimensionDraft: d });
+  },
+
+  // ── Assembly mode ────────────────────────────────────────────────────────
+  enterAssembly() {
+    const s = get();
+    if (s.mode === 'sketch') s.exitSketch();
+    set({
+      mode: 'assembly',
+      gizmoMode: null,
+      facePick: null,
+      mergePick: null,
+      faceSketchMode: false,
+      dimPrompt: null,
+      assembly: {
+        jointValues: {},
+        selectedJointId: s.doc.joints[0]?.id ?? null,
+        selectedLinkId: null,
+        warnings: cycleWarnings(s.doc.joints, s.doc.links),
+      },
+    });
+  },
+
+  exitAssembly() {
+    set({
+      mode: 'model',
+      assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
+    });
+  },
+
+  addJoint(j, select = true) {
+    const d = get().doc;
+    get().setDoc({ ...d, joints: [...d.joints, j] });
+    set((s) => ({
+      assembly: {
+        ...s.assembly,
+        selectedJointId: select ? j.id : s.assembly.selectedJointId,
+        selectedLinkId: null,
+        warnings: cycleWarnings(get().doc.joints, get().doc.links),
+      },
+    }));
+  },
+
+  updateJoint(id, fn) {
+    const d = get().doc;
+    get().setDoc({ ...d, joints: d.joints.map((j) => (j.id === id ? fn(j) : j)) });
+    set((s) => ({ assembly: { ...s.assembly, warnings: cycleWarnings(get().doc.joints, get().doc.links) } }));
+  },
+
+  removeJoint(id) {
+    const d = get().doc;
+    get().setDoc({
+      ...d,
+      joints: d.joints.filter((j) => j.id !== id),
+      // drop any link that referenced the removed joint
+      links: d.links.filter((l) => l.driverJointId !== id && l.drivenJointId !== id),
+    });
+    set((s) => {
+      const { [id]: _drop, ...rest } = s.assembly.jointValues;
+      return {
+        assembly: {
+          ...s.assembly,
+          jointValues: rest,
+          selectedJointId: s.assembly.selectedJointId === id ? null : s.assembly.selectedJointId,
+          warnings: cycleWarnings(get().doc.joints, get().doc.links),
+        },
+      };
+    });
+  },
+
+  addLink(l, select = true) {
+    const d = get().doc;
+    get().setDoc({ ...d, links: [...d.links, l] });
+    set((s) => ({
+      assembly: {
+        ...s.assembly,
+        selectedLinkId: select ? l.id : s.assembly.selectedLinkId,
+        warnings: cycleWarnings(get().doc.joints, get().doc.links),
+      },
+    }));
+  },
+
+  updateLink(id, fn) {
+    const d = get().doc;
+    get().setDoc({ ...d, links: d.links.map((l) => (l.id === id ? fn(l) : l)) });
+    set((s) => ({ assembly: { ...s.assembly, warnings: cycleWarnings(get().doc.joints, get().doc.links) } }));
+  },
+
+  removeLink(id) {
+    const d = get().doc;
+    get().setDoc({ ...d, links: d.links.filter((l) => l.id !== id) });
+    set((s) => ({
+      assembly: {
+        ...s.assembly,
+        selectedLinkId: s.assembly.selectedLinkId === id ? null : s.assembly.selectedLinkId,
+        warnings: cycleWarnings(get().doc.joints, get().doc.links),
+      },
+    }));
+  },
+
+  selectJoint(id) {
+    set((s) => ({ assembly: { ...s.assembly, selectedJointId: id, selectedLinkId: null } }));
+  },
+
+  selectLink(id) {
+    set((s) => ({ assembly: { ...s.assembly, selectedLinkId: id, selectedJointId: null } }));
+  },
+
+  setJointValue(jointId, value) {
+    const d = get().doc;
+    const evalNum = makeEvalNum(d);
+    const updated = propagate(jointId, value, d.joints, d.links, evalNum);
+    set((s) => ({ assembly: { ...s.assembly, jointValues: { ...s.assembly.jointValues, ...updated } } }));
   },
 }));
 

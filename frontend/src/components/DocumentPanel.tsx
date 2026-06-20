@@ -3,6 +3,8 @@ import { DummyPanel } from './DummyPanel';
 import { FeaturesPanel } from './panels/FeaturesPanel';
 import { CanvasPanel } from './panels/CanvasPanel';
 import { InfoPanel } from './panels/InfoPanel';
+import { JointsPanel } from './panels/JointsPanel';
+import { LinksPanel } from './panels/LinksPanel';
 
 // ── Component registry ───────────────────────────────────────────────────
 // Add real components here as they are built. DummyPanel is the fallback.
@@ -17,6 +19,8 @@ const COMPONENT_REGISTRY: Record<string, PanelComponent> = {
   FeaturesPanel,
   CanvasPanel,
   InfoPanel,
+  JointsPanel,
+  LinksPanel,
 };
 
 // ── DocumentPanel host ───────────────────────────────────────────────────

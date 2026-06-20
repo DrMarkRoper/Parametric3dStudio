@@ -72,6 +72,15 @@
     "labelMode": "icon-title"
   },
   {
+    "id": "tb-assembly",
+    "title": "Assembly",
+    "menuFile": "toolbar_assembly.json",
+    "visible": false,
+    "disabled": false,
+    "alignment": "left",
+    "labelMode": "icon-title"
+  },
+  {
     "id": "tb-view",
     "title": "View",
     "menuFile": "toolbar_view.json",
