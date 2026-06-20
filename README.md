@@ -81,7 +81,7 @@ are all fine.
 ## Installation
 
 ```bash
-git clone <your-fork-or-repo-url>
+git clone https://github.com/DrMarkRoper/Parametric3dStudio.git
 cd Parametric3dStudio/frontend
 npm install
 ```
@@ -179,5 +179,4 @@ a PR:
 
 ## License
 
-License terms to be confirmed by the project owner. Until a licence file is
-added, treat the repository as "all rights reserved" by the author.
+MIT
