@@ -10,9 +10,11 @@ import {
   jointDeltaMatrix,
   teethRatio,
   linkKind,
+  solveSlotAngle,
+  solveBodyTransforms,
   type Range,
 } from './assembly';
-import type { Joint, Link } from '../types';
+import type { Doc, Joint, Link, PinSlotJoint } from '../types';
 
 const num = (n: number | null) => n;
 const noEval = (e: string) => {
@@ -161,6 +163,72 @@ describe('transforms & helpers', () => {
     expect(linkKind(rev, rev)).toBe('rot-rot');
     expect(linkKind(rev, pri)).toBe('rot-lin');
     expect(linkKind(pri, pri)).toBe('lin-lin');
+  });
+});
+
+describe('pin-slot loop solver', () => {
+  it('solveSlotAngle is consistent at the home pose', () => {
+    // Crank pivot at (0,-10); slot from (0,5)..(0,45) in leg frame; pin at (0,25).
+    const sol = solveSlotAngle({ x: 0, y: -10 }, { x: 0, y: -10 }, { x: 0, y: 5 }, { x: 0, y: 45 }, { x: 0, y: 25 }, 0);
+    expect(sol).not.toBeNull();
+    expect(sol!.ang).toBeCloseTo(0, 3);
+    expect(sol!.slide).toBeCloseTo(20, 3);
+    expect(sol!.slotLen).toBeCloseTo(40, 3);
+  });
+
+  // Minimal crank-slotted-rocker: a wheel (revolute to ground) carries a crank
+  // pin 10 below its centre; the leg is pinned to that crank and slotted onto a
+  // fixed body pin.
+  const Ow: [number, number, number] = [0, 0, 0];
+  const crankHome: [number, number, number] = [0, 0, -10];
+  const loopDoc = (limits?: { min: string; max: string }): Doc => ({
+    parameters: [], features: [], gridSize: 5, snap: 'grid', links: [],
+    joints: [
+      { id: 'jw', name: 'Wheel', featureId: 'wheel', type: 'revolute', origin: Ow, axis: [1, 0, 0], limits: { mode: 'free' } },
+      { id: 'jleg', name: 'Leg pin', featureId: 'leg', type: 'revolute', origin: crankHome, axis: [1, 0, 0], limits: { mode: 'free' }, baseFeatureId: 'wheel' },
+    ] as Joint[],
+    pinSlots: [
+      {
+        id: 'ps', name: 'Slot', type: 'pinslot',
+        slotFeatureId: 'leg', slotA: [0, 0, 5], slotB: [0, 0, 45],
+        pinFeatureId: 'body', pin: [0, 0, 25],
+        limits: limits ? { mode: 'limited', ...limits } : { mode: 'free' },
+      },
+    ] as PinSlotJoint[],
+  });
+
+  it('leg transform is identity at the home pose (θ = 0)', () => {
+    const res = solveBodyTransforms(loopDoc(), { jw: 0, jleg: 0 }, noEval);
+    expect(res.feasible).toBe(true);
+    const m = res.transforms.get('leg')!;
+    const p = new THREE.Vector3(0, 0, 5).applyMatrix4(m); // a slot point
+    expect(p.x).toBeCloseTo(0, 3);
+    expect(p.y).toBeCloseTo(0, 3);
+    expect(p.z).toBeCloseTo(5, 3);
+  });
+
+  it('solves the leg pose so the fixed pin stays on the slot line as the wheel turns', () => {
+    const res = solveBodyTransforms(loopDoc(), { jw: 30, jleg: 0 }, noEval);
+    expect(res.feasible).toBe(true);
+    const m = res.transforms.get('leg')!;
+    const A = new THREE.Vector3(0, 0, 5).applyMatrix4(m);
+    const B = new THREE.Vector3(0, 0, 45).applyMatrix4(m);
+    const pin = new THREE.Vector3(0, 0, 25); // body is ground → fixed
+    // pin must be collinear with the slot segment (cross product ≈ 0)
+    const dir = new THREE.Vector3().subVectors(B, A);
+    const w = new THREE.Vector3().subVectors(pin, A);
+    const cross = new THREE.Vector3().crossVectors(w, dir).length() / (dir.length() || 1);
+    expect(cross).toBeLessThan(1e-3);
+    // and the slide must stay within the slot
+    const t = w.dot(dir) / dir.lengthSq();
+    expect(t).toBeGreaterThanOrEqual(0);
+    expect(t).toBeLessThanOrEqual(1);
+  });
+
+  it('clamps-and-stops: an out-of-range slide is infeasible', () => {
+    // Limit the slide to 0..5 from A, but the home slide is 20 → infeasible.
+    const res = solveBodyTransforms(loopDoc({ min: '0', max: '5' }), { jw: 0, jleg: 0 }, noEval);
+    expect(res.feasible).toBe(false);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   acceptExtrude,
   addJointCmd,
   addLinkCmd,
+  addPinSlotCmd,
   addPrimitive,
   cancelFacePick,
   cancelMerge,
@@ -133,6 +134,7 @@ export function useStudioActions() {
       'studio:assembly:revolute': () => addJointCmd('revolute'),
       'studio:assembly:prismatic': () => addJointCmd('prismatic'),
       'studio:assembly:link': () => addLinkCmd(),
+      'studio:assembly:pinslot': () => addPinSlotCmd(),
       'studio:assembly:delete': () => deleteAssemblyCmd(),
     };
 

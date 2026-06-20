@@ -5,7 +5,7 @@ import { Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrbitControls, Ort
 import type { CogProfile, CornerMod, DimensionAnchor, DimensionEntity, Doc, Feature, ImageEntity, ImportFeature, Joint, PrimitiveFeature, SketchEntity, SketchFeature, Vec2 } from '../types';
 import { uid } from '../types';
 import { planeBasis, sketchMatrix, type BodyOut } from '../core/buildGeometry';
-import { bodyDeltaMatrix } from '../core/assembly';
+import { solveBodyTransforms } from '../core/assembly';
 import { tryEval, type Params } from '../core/expressions';
 import {
   applyCornerMods,
@@ -2020,21 +2020,18 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
 
   // ── Assembly mode: joint transform overlay + drive handles ───────────────
   const joints = useStore((s) => s.doc.joints);
+  const pinSlots = useStore((s) => s.doc.pinSlots);
   const jointValues = useStore((s) => s.assembly.jointValues);
   const selectedJointId = useStore((s) => s.assembly.selectedJointId);
   const assemblyMode = mode === 'assembly';
-  // Per-body delta transform from its joint(s) at the current drive value.
+  // Per-body delta transform, including closed-loop (pin-slot) bodies solved
+  // from the driver. Single source of truth: the assembly solver.
   const bodyMatrices = useMemo(() => {
-    const map = new Map<string, THREE.Matrix4>();
-    if (!assemblyMode) return map;
-    for (const b of bodies) {
-      if (map.has(b.featureId)) continue;
-      if (joints.some((j) => j.featureId === b.featureId)) {
-        map.set(b.featureId, bodyDeltaMatrix(b.featureId, joints, jointValues));
-      }
-    }
-    return map;
-  }, [assemblyMode, bodies, joints, jointValues]);
+    if (!assemblyMode) return new Map<string, THREE.Matrix4>();
+    const evalNum = (e: string) => tryEval(e, params);
+    return solveBodyTransforms(doc, jointValues, evalNum).transforms;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assemblyMode, doc, jointValues, params]);
 
   const sketch = (doc.features.find((f) => f.id === activeSketchId && f.type === 'sketch') ?? null) as SketchFeature | null;
   const selected = doc.features.find((f) => f.id === selectedFeatureId);
@@ -2253,6 +2250,31 @@ export function Viewport({ bodies, rev, params }: { bodies: BodyOut[]; rev: numb
             bodies={bodies}
           />
         )}
+
+        {/* pin-slot visualisation: slot centre-line (moves with the slot body)
+            + the fixed pin */}
+        {assemblyMode && (pinSlots ?? []).map((ps) => {
+          const legM = bodyMatrices.get(ps.slotFeatureId) ?? new THREE.Matrix4();
+          const a = new THREE.Vector3(ps.slotA[0], ps.slotA[1], ps.slotA[2]).applyMatrix4(legM);
+          const b = new THREE.Vector3(ps.slotB[0], ps.slotB[1], ps.slotB[2]).applyMatrix4(legM);
+          const pinM = ps.pinFeatureId ? bodyMatrices.get(ps.pinFeatureId) ?? new THREE.Matrix4() : null;
+          const pin = pinM ? new THREE.Vector3(ps.pin[0], ps.pin[1], ps.pin[2]).applyMatrix4(pinM) : null;
+          return (
+            <group key={ps.id}>
+              <Line
+                points={[[a.x, a.y, a.z], [b.x, b.y, b.z]] as Pt3[]}
+                color="#f5a623"
+                lineWidth={3}
+              />
+              {pin && (
+                <mesh position={[pin.x, pin.y, pin.z]}>
+                  <sphereGeometry args={[2.5, 16, 16]} />
+                  <meshBasicMaterial color="#4f8cff" depthTest={false} />
+                </mesh>
+              )}
+            </group>
+          );
+        })}
 
         {/* sketches (non-active shown faint in model mode) */}
         {sketches

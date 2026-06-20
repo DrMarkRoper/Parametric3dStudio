@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
-import { emptyDoc, uid, type Doc, type Feature, type Joint, type Link, type Parameter, type SketchFeature, type SnapMode, type Vec2 } from '../types';
-import { cycleWarnings, propagate } from '../core/assembly';
+import { emptyDoc, uid, type Doc, type Feature, type Joint, type Link, type Parameter, type PinSlotJoint, type SketchFeature, type SnapMode, type Vec2 } from '../types';
+import { cycleWarnings, propagate, solveBodyTransforms } from '../core/assembly';
 import { resolveParameters, tryEval } from '../core/expressions';
 
 export type Tool =
@@ -66,6 +66,7 @@ export interface AssemblyState {
   jointValues: Record<string, number>;
   selectedJointId: string | null;
   selectedLinkId: string | null;
+  selectedPinSlotId: string | null;
   /** Cycle / over-constraint warnings recomputed on link changes. */
   warnings: string[];
 }
@@ -188,8 +189,12 @@ interface State {
   addLink: (l: Link, select?: boolean) => void;
   updateLink: (id: string, fn: (l: Link) => Link) => void;
   removeLink: (id: string) => void;
+  addPinSlot: (ps: PinSlotJoint, select?: boolean) => void;
+  updatePinSlot: (id: string, fn: (ps: PinSlotJoint) => PinSlotJoint) => void;
+  removePinSlot: (id: string) => void;
   selectJoint: (id: string | null) => void;
   selectLink: (id: string | null) => void;
+  selectPinSlot: (id: string | null) => void;
   /** Drive a joint to `value`, clamped and propagated across links. */
   setJointValue: (jointId: string, value: number) => void;
 }
@@ -228,7 +233,7 @@ export const useStore = create<State>((set, get) => ({
   projectMeta: emptyProjectMeta(),
   dirty: false,
 
-  assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
+  assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, selectedPinSlotId: null, warnings: [] },
 
   orthographic: false,
   toggleProjection() {
@@ -285,7 +290,7 @@ export const useStore = create<State>((set, get) => ({
       dimPrompt: null,
       projectMeta: emptyProjectMeta(),
       dirty: false,
-      assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
+      assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, selectedPinSlotId: null, warnings: [] },
     });
   },
 
@@ -322,6 +327,8 @@ export const useStore = create<State>((set, get) => ({
       features: d.features.filter((f) => !dead.has(f.id)),
       joints: d.joints.filter((j) => !deadJoints.has(j.id)),
       links: d.links.filter((l) => !deadJoints.has(l.driverJointId) && !deadJoints.has(l.drivenJointId)),
+      // drop pin-slots whose slot or pin body was deleted
+      pinSlots: (d.pinSlots ?? []).filter((ps) => !dead.has(ps.slotFeatureId) && !dead.has(ps.pinFeatureId)),
     });
     for (const k of dead) importCache.delete(k);
     set((s) => ({
@@ -475,6 +482,7 @@ export const useStore = create<State>((set, get) => ({
         jointValues: {},
         selectedJointId: s.doc.joints[0]?.id ?? null,
         selectedLinkId: null,
+        selectedPinSlotId: null,
         warnings: cycleWarnings(s.doc.joints, s.doc.links),
       },
     });
@@ -483,7 +491,7 @@ export const useStore = create<State>((set, get) => ({
   exitAssembly() {
     set({
       mode: 'model',
-      assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, warnings: [] },
+      assembly: { jointValues: {}, selectedJointId: null, selectedLinkId: null, selectedPinSlotId: null, warnings: [] },
     });
   },
 
@@ -557,19 +565,51 @@ export const useStore = create<State>((set, get) => ({
     }));
   },
 
+  addPinSlot(ps, select = true) {
+    const d = get().doc;
+    get().setDoc({ ...d, pinSlots: [...(d.pinSlots ?? []), ps] });
+    if (select) set((s) => ({ assembly: { ...s.assembly, selectedPinSlotId: ps.id, selectedJointId: null, selectedLinkId: null } }));
+  },
+
+  updatePinSlot(id, fn) {
+    const d = get().doc;
+    get().setDoc({ ...d, pinSlots: (d.pinSlots ?? []).map((ps) => (ps.id === id ? fn(ps) : ps)) });
+  },
+
+  removePinSlot(id) {
+    const d = get().doc;
+    get().setDoc({ ...d, pinSlots: (d.pinSlots ?? []).filter((ps) => ps.id !== id) });
+    set((s) => ({
+      assembly: { ...s.assembly, selectedPinSlotId: s.assembly.selectedPinSlotId === id ? null : s.assembly.selectedPinSlotId },
+    }));
+  },
+
   selectJoint(id) {
-    set((s) => ({ assembly: { ...s.assembly, selectedJointId: id, selectedLinkId: null } }));
+    set((s) => ({ assembly: { ...s.assembly, selectedJointId: id, selectedLinkId: null, selectedPinSlotId: null } }));
   },
 
   selectLink(id) {
-    set((s) => ({ assembly: { ...s.assembly, selectedLinkId: id, selectedJointId: null } }));
+    set((s) => ({ assembly: { ...s.assembly, selectedLinkId: id, selectedJointId: null, selectedPinSlotId: null } }));
+  },
+
+  selectPinSlot(id) {
+    set((s) => ({ assembly: { ...s.assembly, selectedPinSlotId: id, selectedJointId: null, selectedLinkId: null } }));
   },
 
   setJointValue(jointId, value) {
     const d = get().doc;
     const evalNum = makeEvalNum(d);
-    const updated = propagate(jointId, value, d.joints, d.links, evalNum);
-    set((s) => ({ assembly: { ...s.assembly, jointValues: { ...s.assembly.jointValues, ...updated } } }));
+    const propagated = propagate(jointId, value, d.joints, d.links, evalNum);
+    const candidate = { ...get().assembly.jointValues, ...propagated };
+    // Closed-loop bodies (pin-slot) are solved, not ratio-driven. If solving the
+    // loop at the candidate values fails (no solution / pin left the slot), this
+    // drive step is infeasible — clamp-and-stop by leaving state unchanged.
+    if ((d.pinSlots ?? []).length > 0) {
+      const res = solveBodyTransforms(d, candidate, evalNum);
+      if (!res.feasible) return;
+      Object.assign(candidate, res.solvedValues);
+    }
+    set((s) => ({ assembly: { ...s.assembly, jointValues: candidate } }));
   },
 }));
 

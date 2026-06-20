@@ -306,6 +306,27 @@ export type Vec3 = [number, number, number];
 
 export type JointType = 'revolute' | 'prismatic';
 
+/** A straight slot (groove) carried by a body, used by a pin-slot joint. The
+ *  endpoints are stored in the slot body's home (design) frame — since engine
+ *  geometry is baked to world, that home frame is world-at-design, and the
+ *  endpoints are transformed by the body's solved pose when the loop is solved. */
+export interface PinSlotJoint {
+  id: string;
+  name: string;
+  type: 'pinslot';
+  /** Body carrying the slot (e.g. the leg). */
+  slotFeatureId: string;
+  /** Slot centre-line endpoints, in the slot body's home frame. */
+  slotA: Vec3;
+  slotB: Vec3;
+  /** Body carrying the pin (e.g. the body / ground). Empty until configured. */
+  pinFeatureId: string;
+  /** Pin point in the pin body's home frame. */
+  pin: Vec3;
+  /** Optional slide limits along the slot (length units measured from slotA). */
+  limits: JointLimits;
+}
+
 /** Allowed-motion limits for a joint. `free` = unbounded; `limited` reads min/max. */
 export interface JointLimits {
   mode: 'free' | 'limited';
@@ -334,6 +355,13 @@ export interface Joint {
   /** Revolute: rotation axis. Prismatic: translation direction. Normalised. */
   axis: Vec3;
   limits: JointLimits;
+  /**
+   * Body this joint moves relative to. Omitted/empty = ground (world) — the v1
+   * default. When set, the joint origin/axis are taken in that base body's frame
+   * and move with it (a joint *between two bodies*), e.g. a leg pinned to a
+   * crank pin on the wheel. Used by the closed-loop solver.
+   */
+  baseFeatureId?: string;
 }
 
 /** The coupling type, derived from the two joints' types. */
@@ -368,6 +396,8 @@ export interface Doc {
   joints: Joint[];
   /** Mechanical links between joints (Assembly mode). Optional for legacy files. */
   links: Link[];
+  /** Pin-slot joints (Assembly mode closed loops). Optional for legacy files. */
+  pinSlots: PinSlotJoint[];
 }
 
 export const emptyDoc = (): Doc => ({
@@ -377,6 +407,7 @@ export const emptyDoc = (): Doc => ({
   snap: 'grid',
   joints: [],
   links: [],
+  pinSlots: [],
 });
 
 export const uid = (): string => Math.random().toString(36).slice(2, 10);

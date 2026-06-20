@@ -118,9 +118,10 @@ export async function loadProject(file: File): Promise<{ doc: Doc; meta: Project
     snap: (['none', 'grid', 'edge'] as SnapMode[]).includes(doc.snap)
       ? (doc.snap as SnapMode)
       : doc.snap === false ? 'none' : 'grid',
-    // Assembly joints/links — absent in legacy files → empty arrays.
+    // Assembly joints/links/pin-slots — absent in legacy files → empty arrays.
     joints: Array.isArray(doc.joints) ? doc.joints : [],
     links: Array.isArray(doc.links) ? doc.links : [],
+    pinSlots: Array.isArray(doc.pinSlots) ? doc.pinSlots : [],
   };
 
   // Project meta — older files may not have a meta field; fill with defaults

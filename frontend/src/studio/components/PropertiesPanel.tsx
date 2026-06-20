@@ -16,6 +16,7 @@ import type {
   LineEntity,
   Link,
   MergeOp,
+  PinSlotJoint,
   PrimitiveFeature,
   PrimitiveShape,
   RectEntity,
@@ -27,7 +28,7 @@ import type {
 import { BOLT_PRESETS, BULB_PRESETS, THREAD_SHAPES, isEdisonThread } from '../types';
 import { importCache, nextName, uid, useStore, type DynamicOp } from '../state/store';
 import { tryEval, type Params } from '../core/expressions';
-import { linkKind, resolvedRange, teethRatio, type Range } from '../core/assembly';
+import { isLoopSolvedJoint, linkKind, resolvedRange, teethRatio, type Range } from '../core/assembly';
 import { cogTeethForFeature, reselectExtrudeFaces, resetExtrudeProfiles } from '../studioBridge';
 import type { BodyOut } from '../core/buildGeometry';
 import { dist2d, entitiesBounds, modColor, modsForEntity, rectCorners, resolveDimAnchor, rotateEntitiesInSketch, translateEntitiesInSketch, translateEntityInSketch } from '../core/sketchGeometry';
@@ -1898,10 +1899,13 @@ function JointEditor({
   joints: Joint[];
   links: Link[];
 }) {
+  const doc = useStore((s) => s.doc);
   const update = (fn: (j: Joint) => Joint) => useStore.getState().updateJoint(joint.id, fn);
   const drive = (v: number) => useStore.getState().setJointValue(joint.id, v);
   const evalNum = (e: string) => tryEval(e, params);
   const unit = joint.type === 'revolute' ? '°' : 'mm';
+  const bodies = doc.features.filter((f) => f.type !== 'sketch');
+  const loopSolved = isLoopSolvedJoint(doc, joint);
   const range = resolvedRange(joint.id, joints, links, evalNum);
   const isFree = range.min === null && range.max === null;
   const lo = range.min ?? (joint.type === 'revolute' ? -180 : -100);
@@ -1940,6 +1944,23 @@ function JointEditor({
           <option value="prismatic">Prismatic (slide)</option>
         </select>
       </div>
+      <div className="field">
+        <span className="flabel">Base (relative to)</span>
+        <select
+          value={joint.baseFeatureId ?? ''}
+          title="Ground = moves relative to the world. Pick a body to pin this joint to a moving part (e.g. a leg pinned to a crank on the wheel)."
+          onChange={(e) => update((j) => ({ ...j, baseFeatureId: e.target.value || undefined }))}
+        >
+          <option value="">Ground</option>
+          {bodies
+            .filter((f) => f.id !== joint.featureId)
+            .map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+        </select>
+      </div>
       <Vec3Fields label="Origin" value={joint.origin} onChange={(v) => update((j) => ({ ...j, origin: v }))} />
       <Vec3Fields
         label={joint.type === 'revolute' ? 'Axis (rotation)' : 'Axis (slide direction)'}
@@ -1976,41 +1997,110 @@ function JointEditor({
         </div>
       )}
       <div className="props-sub">Drive</div>
-      <div className="hint">Resolved range: {fmtRange(range, unit)}</div>
-      <input
-        type="range"
-        min={lo}
-        max={hi}
-        step={sliderStep}
-        value={clamped}
-        onChange={(e) => drive(parseFloat(e.target.value))}
-        style={{ width: '100%' }}
-      />
-      <div className="field-row" style={{ gap: 4, marginTop: 2 }}>
-        <button
-          className="link-btn"
-          title={`Step back ${step}${unit}`}
-          style={{ flex: 1 }}
-          onClick={() => applyStep(-step)}
-        >
-          «
-        </button>
-        <button className="link-btn" title="Reset to design position" style={{ flex: 1 }} onClick={() => drive(0)}>
-          0{unit}
-        </button>
-        <button
-          className="link-btn"
-          title={`Step forward ${step}${unit}`}
-          style={{ flex: 1 }}
-          onClick={() => applyStep(step)}
-        >
-          »
-        </button>
-      </div>
-      <NumInput label={`Value ${unit}`} value={Math.round(jointValue * 100) / 100} onCommit={(v) => drive(v)} />
-      <NumInput label={`Step ${unit}`} value={step} onCommit={(v) => setStep(v > 0 ? v : step)} />
+      {loopSolved ? (
+        <div className="hint">
+          Solved by a pin-slot loop — this joint follows the driver automatically and isn't dragged directly.
+        </div>
+      ) : (
+        <>
+          <div className="hint">Resolved range: {fmtRange(range, unit)}</div>
+          <input
+            type="range"
+            min={lo}
+            max={hi}
+            step={sliderStep}
+            value={clamped}
+            onChange={(e) => drive(parseFloat(e.target.value))}
+            style={{ width: '100%' }}
+          />
+          <div className="field-row" style={{ gap: 4, marginTop: 2 }}>
+            <button className="link-btn" title={`Step back ${step}${unit}`} style={{ flex: 1 }} onClick={() => applyStep(-step)}>
+              «
+            </button>
+            <button className="link-btn" title="Reset to design position" style={{ flex: 1 }} onClick={() => drive(0)}>
+              0{unit}
+            </button>
+            <button className="link-btn" title={`Step forward ${step}${unit}`} style={{ flex: 1 }} onClick={() => applyStep(step)}>
+              »
+            </button>
+          </div>
+          <NumInput label={`Value ${unit}`} value={Math.round(jointValue * 100) / 100} onCommit={(v) => drive(v)} />
+          <NumInput label={`Step ${unit}`} value={step} onCommit={(v) => setStep(v > 0 ? v : step)} />
+        </>
+      )}
       <button className="link-btn" style={{ marginTop: 6 }} onClick={() => useStore.getState().removeJoint(joint.id)}>
         Delete joint
+      </button>
+    </div>
+  );
+}
+
+function PinSlotEditor({ ps, params }: { ps: PinSlotJoint; params: Params }) {
+  const doc = useStore((s) => s.doc);
+  const update = (fn: (p: PinSlotJoint) => PinSlotJoint) => useStore.getState().updatePinSlot(ps.id, fn);
+  const bodies = doc.features.filter((f) => f.type !== 'sketch');
+  const bodyName = (id: string) => doc.features.find((f) => f.id === id)?.name ?? '(none)';
+
+  return (
+    <div className="assembly-editor" style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }}>
+      <TextEdit label="Name" value={ps.name} onCommit={(v) => update((p) => ({ ...p, name: v }))} />
+      <div className="field">
+        <span className="flabel">Slot body</span>
+        <div className="hint">{bodyName(ps.slotFeatureId)}</div>
+      </div>
+      <Vec3Fields label="Slot end A" value={ps.slotA} onChange={(v) => update((p) => ({ ...p, slotA: v }))} />
+      <Vec3Fields label="Slot end B" value={ps.slotB} onChange={(v) => update((p) => ({ ...p, slotB: v }))} />
+      <div className="field">
+        <span className="flabel">Pin body</span>
+        <select
+          value={ps.pinFeatureId}
+          title="The body carrying the pin that rides in the slot (often the static body / ground)."
+          onChange={(e) => update((p) => ({ ...p, pinFeatureId: e.target.value }))}
+        >
+          <option value="">— pick a body —</option>
+          {bodies
+            .filter((f) => f.id !== ps.slotFeatureId)
+            .map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+        </select>
+      </div>
+      <Vec3Fields label="Pin point" value={ps.pin} onChange={(v) => update((p) => ({ ...p, pin: v }))} />
+      <div className="props-sub">Slide limits</div>
+      <div className="field">
+        <span className="flabel">Range</span>
+        <select
+          value={ps.limits.mode}
+          onChange={(e) => update((p) => ({ ...p, limits: { ...p.limits, mode: e.target.value as 'free' | 'limited' } }))}
+        >
+          <option value="free">Free (full slot)</option>
+          <option value="limited">Limited</option>
+        </select>
+      </div>
+      {ps.limits.mode === 'limited' && (
+        <div className="field-row">
+          <ExprInput
+            label="Min (from A)"
+            value={ps.limits.min ?? '0'}
+            params={params}
+            onCommit={(v) => update((p) => ({ ...p, limits: { ...p.limits, min: v } }))}
+          />
+          <ExprInput
+            label="Max (from A)"
+            value={ps.limits.max ?? '0'}
+            params={params}
+            onCommit={(v) => update((p) => ({ ...p, limits: { ...p.limits, max: v } }))}
+          />
+        </div>
+      )}
+      <div className="hint">
+        The slot body needs a Revolute joint with a <em>Base</em> of the driving part (the crank) so the loop can be
+        inferred and solved. Drive the crank/wheel to see the leg follow.
+      </div>
+      <button className="link-btn" style={{ marginTop: 6 }} onClick={() => useStore.getState().removePinSlot(ps.id)}>
+        Delete pin-slot
       </button>
     </div>
   );
@@ -2147,11 +2237,15 @@ export function AssemblyJointsSection({ params }: { params: Params }) {
   const doc = useStore((s) => s.doc);
   const joints = doc.joints;
   const links = doc.links;
+  const pinSlots = doc.pinSlots ?? [];
   const selectedJointId = useStore((s) => s.assembly.selectedJointId);
+  const selectedPinSlotId = useStore((s) => s.assembly.selectedPinSlotId);
   const jointValues = useStore((s) => s.assembly.jointValues);
   const selectJoint = useStore((s) => s.selectJoint);
+  const selectPinSlot = useStore((s) => s.selectPinSlot);
   const bodyName = (fid: string) => doc.features.find((f) => f.id === fid)?.name ?? '(deleted)';
   const selJoint = joints.find((j) => j.id === selectedJointId) ?? null;
+  const selPinSlot = pinSlots.find((p) => p.id === selectedPinSlotId) ?? null;
 
   return (
     <>
@@ -2179,6 +2273,17 @@ export function AssemblyJointsSection({ params }: { params: Params }) {
           links={links}
         />
       )}
+
+      {pinSlots.length > 0 && <div className="props-sub" style={{ marginTop: 12 }}>Pin-slots</div>}
+      {pinSlots.map((p) => (
+        <button key={p.id} style={assemblyRowStyle(p.id === selectedPinSlotId)} onClick={() => selectPinSlot(p.id)}>
+          <span>{p.name}</span>
+          <span style={{ opacity: 0.75, fontSize: 12 }}>
+            ⊟ {bodyName(p.slotFeatureId)}
+          </span>
+        </button>
+      ))}
+      {selPinSlot && <PinSlotEditor key={selPinSlot.id} ps={selPinSlot} params={params} />}
     </>
   );
 }

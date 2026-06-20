@@ -179,8 +179,18 @@ toolbar. Prototype stage.
   free revolute wraps past ±180°). Values clamp to the resolved range
   (own range ∩ each partner's range mapped through the ratio) and propagate
   across links (undirected: forward by ratio, inverse the other way). Acyclic
-  driver→driven only — cycles are detected and warned (status bar + Joints tab),
-  never solved. **Non-destructive**: the model tree is frozen, geometry is baked
+  ratio chains; ratio cycles are detected and warned (status bar + Joints tab),
+  never solved. **Pin-slot joints + closed-loop solving** (see
+  `assembly_mode_design_guide.md` §11): a `PinSlotJoint` (`Doc.pinSlots`) ties a
+  straight slot on one body to a pin on another; a joint may set `baseFeatureId`
+  to be pinned to a *moving* body (a crank). `core/assembly.ts`
+  `solveBodyTransforms` is the single source of body transforms — it
+  forward-resolves simple/based bodies, **infers** crank-slotted-rocker loops (a
+  pin-slot's slot body that also has a based revolute) and solves the slot body's
+  angle (`solveSlotAngle`, scan+bisect). Driving is **clamp-and-stop**:
+  `setJointValue` runs the solver and rejects a step that makes any loop
+  infeasible (no solution / pin off the slot). This drives the wheel-leg
+  (crank + slotted rocker) mechanism. **Non-destructive**: the model tree is frozen, geometry is baked
   to world space so the home pose is the identity, motion is a transient overlay
   (`assembly.jointValues`, not undoable, not serialised), and leaving the mode
   snaps everything home. Joint/link *definitions* live on `Doc` (serialised,

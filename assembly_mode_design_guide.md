@@ -419,3 +419,198 @@ already a snap point — `project_context.md` §8.2) makes origin-picking precis
 - **Layout note.** Because the toolbar and the Joints/Links tabs are defined in
   `public/data/layout/default_layout.json`, a browser with an older persisted
   layout must run **View → Reset Workspace Layout** once to pick them up.
+
+---
+
+## 11. Pin-slot joints & closed-loop mechanisms (proposed — not yet implemented)
+
+> **Status**: **implemented** (decisions locked: straight-segment slot only;
+> slot stored in the slot body's local/home frame; loops inferred automatically;
+> unreachable driver angles clamp-and-stop). Extends v1 (revolute + prismatic
+> joints, ratio links, acyclic chains) with (a) a **pin-slot** joint and (b) a
+> minimal **closed-loop position solver**, because the motivating mechanism — a
+> crank driving a slotted rocker — is a single-DOF *closed loop* the ratio-link
+> model cannot express. As-built summary at §11.9.
+
+### 11.1 Motivating mechanism (the wheel-leg)
+
+From a real project file, the leg assembly is a textbook **crank + slotted
+rocker**:
+
+- The **wheel** spins about its axle (one revolute to ground — the driver).
+- An **off-centre crank pin** (the "wheel sprocket") is rigid to the wheel, so it
+  orbits the axle at a fixed radius as the wheel turns.
+- The **leg**'s lower hole is **pinned** to that crank pin (a revolute between leg
+  and wheel).
+- The leg has a **slot**; a **pin fixed to the body** (the "body sprocket") rides
+  in that slot.
+
+The leg is therefore grounded **twice** — once through the wheel/crank, once
+through the slot pin back to the body — which **closes a kinematic loop**.
+
+Planar mobility (Gruebler), with body = ground and wheel + leg as the two moving
+links, two revolutes and one pin-slot:
+
+```
+M = 3(N − 1) − 2·P − 1·H
+  = 3(3 − 1) − 2·2 − 1·1 = 1
+```
+
+**Mobility = 1**: one input (the wheel angle) fully determines the leg's
+orientation and its slide along the slot. The leg's angle is a *nonlinear
+(trigonometric)* function of the wheel angle — **not** a constant ratio — so it
+cannot be modelled with a `ratio` link, and any attempt to link the leg to both
+the wheel and the body trips the existing cycle detector (by design, §5.3).
+
+Note: the leg must **not** rotate rigidly with the crank pin. It is *pinned* to
+it; the slot-on-fixed-pin is precisely what converts the crank's orbit into the
+leg's rocking. A rigid weld would make the slot meaningless.
+
+### 11.2 New joint type — Pin-slot
+
+A **pin-slot** constrains a *point* (the pin) to lie on a *line segment* fixed in
+another body (the slot). It is a 2-DOF "higher pair": the pin may **slide** along
+the slot and the two bodies may **rotate** relative to each other. It removes one
+constraint (the perpendicular-to-slot offset).
+
+```typescript
+type JointType = 'revolute' | 'prismatic' | 'pinslot';   // extend the union
+
+interface PinSlotJoint {
+  id: string;
+  name: string;
+  type: 'pinslot';
+  /** Body that carries the slot (e.g. the leg). */
+  slotFeatureId: string;
+  /** Slot centre-line in world space at the design (home) pose: two endpoints.
+   *  Stored in world like all baked geometry; transformed by the slot body's
+   *  current pose when solving. */
+  slotA: Vec3;
+  slotB: Vec3;
+  /** Body that carries the pin (e.g. the body/ground). */
+  pinFeatureId: string;
+  /** Pin point in world space at the design pose. */
+  pin: Vec3;
+  /** Optional slide limits along the slot (length units from slotA). */
+  limits: JointLimits;
+}
+```
+
+Seeding (like revolute/prismatic): when the user adds a pin-slot, default
+`slotA` / `slotB` from the two slot-end snap points of the selected slotted body
+and `pin` from the selected pin body's hole centre — both editable numerically.
+
+### 11.3 Topology — loops are explicit, and solved (not warned)
+
+Today the link graph must be acyclic; a cycle is detected and *disabled* (§5.3).
+This feature introduces a **loop group**: a set of joints/bodies the user marks
+(or that the engine infers) as a closed kinematic chain to be solved together.
+
+- Detection: when adding a pin-slot (or a second grounding joint on a body that's
+  already connected through another path) the engine recognises a closed loop and
+  offers to treat it as a **solved loop** instead of erroring.
+- A solved loop still has exactly one **driver** DOF (here, the wheel revolute);
+  the remaining joint DOFs in the loop (leg rotation about the crank pin, slide
+  along the slot) become **dependent, solved** outputs — neither free-drag nor
+  ratio-linked.
+
+### 11.4 The solver
+
+Because mobility is 1, this is a **one-unknown** problem per drive step — small
+and robust. For the crank-slotted-rocker:
+
+1. From the driver (wheel angle `θw`), place the crank pin in world:
+   `P_crank = wheelCentre + R(axis, θw)·(crankOffset)`.
+2. The leg's lower pin coincides with `P_crank` (the leg-wheel revolute), so the
+   leg's position is known up to its orientation `φ` about `P_crank`.
+3. Solve `φ` so the slot centre-line (through `P_crank`, direction set by `φ`)
+   passes through the fixed pin `Pb`. This is a single trig equation:
+   the perpendicular distance from `Pb` to the slot line must be zero. Closed-form
+   where possible, else 2–3 Newton iterations on the residual.
+4. The slide parameter `s` = projection of `Pb` onto the slot line (for limit
+   checks / readout).
+5. Compose the leg's delta transform from `(P_crank, φ)` and apply it as the
+   usual overlay (§2/§9.x).
+
+Generalisation: the same residual-minimisation shape (Newton-Raphson over the
+loop's unknown joint values, driving constraint residuals to zero) extends to
+other planar loops (four-bar, etc.) later. v1-of-this-feature only needs the
+single-loop, single-unknown case to ship the wheel-leg.
+
+**Driver range from a loop.** A solved loop may not be reachable over the full
+driver range (the slot pin can hit a slot end, or the linkage can lock). The
+driver's resolved range (§5.1) should be intersected with the **feasible** range
+found by the solver (where a solution exists and slide stays within slot limits);
+outside it, clamp and flag, consistent with the existing over-constraint warning.
+
+### 11.5 UI
+
+- **Toolbar / menu**: add **Pin-slot Joint** beside Revolute / Prismatic in the
+  `tb-assembly` block and the Assembly menu.
+- **Pin-slot editor** (Joints tab): slot body + two slot endpoints (X/Y/Z each),
+  pin body + pin point, optional slide min/max, and a live slide readout.
+- **Handles**: draw the slot as a capsule/line on the slot body and the pin as a
+  small sphere; the pin visibly slides along the slot as the driver moves. The
+  loop's driver keeps its normal ring/arrow handle.
+- **Loop affordance**: when a loop is recognised, show it as a solved group (e.g.
+  a badge on its joints) rather than the red cycle warning.
+
+### 11.6 Data-model / engine touch-points (when implemented)
+
+- `types.ts`: extend `JointType`; add `PinSlotJoint` (or fold slot fields into a
+  discriminated `Joint` union).
+- `core/assembly.ts`: pin-slot residual + a `solveLoop(driverValue, loop, …)`
+  routine; feasibility-range helper; keep the existing pure/tested style (add
+  cases to `assembly.test.ts`: crank-slotted-rocker positions at a few angles,
+  slide-limit clamping, unreachable-angle handling).
+- `store.ts`: loop grouping in the assembly state; `setJointValue` routes a
+  driver that belongs to a loop through `solveLoop` instead of ratio-propagation.
+- `Viewport.tsx`: slot + pin handles; apply solved leg transform.
+- `PropertiesPanel.tsx`: pin-slot editor; loop badge.
+
+### 11.7 Scope & sequencing
+
+This is the **closed-loop solving** item parked in §8, not a tweak to the
+ratio-link system. Suggested order: (1) pin-slot joint type + handle + editor as
+a *visual* constraint first; (2) the single-loop solver wired into the drive
+path; (3) feasibility-range + limit handling; (4) generalise the solver to
+multi-bar loops later. The motivating wheel-leg is the simplest non-trivial loop
+(1-DOF, one slot), so the solver itself is small — most of the effort is the new
+joint type and routing loop-solving into the drive/propagation path.
+
+### 11.8 Open questions for review
+
+- Should the slot be a straight segment only (v1) or allow an arc/curve slot too?
+- Define the slot in **world** (baked, like other joint geometry) or **relative to
+  the slot body's local frame** (more robust if that body is later re-edited)?
+- Is the loop **inferred** automatically when a pin-slot closes a path back to
+  ground, or must the user explicitly mark the loop group?
+- For unreachable driver angles, prefer **clamp-and-stop** at the feasibility
+  limit, or visibly **flag and freeze**? (Mirror §5.1's empty-range behaviour.)
+
+### 11.9 As-built (what shipped)
+
+- **`PinSlotJoint`** added to `types.ts` (`Doc.pinSlots`, serialised + loaded with
+  legacy `[]`); slot endpoints `slotA`/`slotB` stored in the slot body's home
+  frame. **Straight segment only.** Joints gained an optional **`baseFeatureId`**
+  so a revolute can be pinned to a *moving* body (the crank), default ground.
+- **`solveBodyTransforms(doc, jointValues, evalNum)`** in `core/assembly.ts` is
+  now the single source of body transforms in Assembly mode: it forward-resolves
+  simple/based bodies, then **infers** each crank-slotted-rocker loop (a body
+  that is a pin-slot's slot body *and* has a based revolute) and solves the slot
+  body's angle with `solveSlotAngle` (full-circle scan + bisect, branch nearest
+  the previous solution). Returns `{ transforms, solvedValues, feasible }`.
+- **Clamp-and-stop**: `store.setJointValue` runs the solver on the candidate
+  values and, if any loop is infeasible (no solution or the pin leaves the slot /
+  exceeds slide limits), leaves state unchanged — the driver stops at the limit.
+- **UI**: Pin-slot in the `tb-assembly` toolbar + Assembly menu; a `PinSlotEditor`
+  (slot endpoints, pin body + point, slide limits) and a **Base** select on the
+  joint editor; loop-solved revolutes hide their drive slider. The Viewport draws
+  the slot centre-line (amber, moves with the leg) and the fixed pin (blue).
+- **Tests**: `assembly.test.ts` covers `solveSlotAngle` at home, the loop home
+  pose, pin-stays-on-slot as the wheel turns, and clamp-and-stop on an
+  out-of-range slide.
+- **Deferred** (unchanged from the proposal): curved slots, multi-bar / >1-DOF
+  loops, and on-canvas picking of slot/pin/crank points (currently numeric entry,
+  seeded from the body bbox). Loop **inference** is automatic — no explicit loop
+  object — per the locked decision.

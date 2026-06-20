@@ -29,6 +29,7 @@ import {
   type JointType,
   type Link,
   type MergeOp,
+  type PinSlotJoint,
   type PlaneId,
   type PrimitiveFeature,
   type PrimitiveShape,
@@ -408,7 +409,7 @@ function nextAssemblyName(existing: { name: string }[], prefix: string): string 
 /** World-space bounding box of a body (across all its BodyOut pieces). Returns
  *  the centre and the body's thinnest principal direction — a good default
  *  revolute axis for a flat disc / cog (its spin axis). */
-function bodyBox(featureId: string): { center: Vec3; thinAxis: Vec3 } | null {
+function bodyBox(featureId: string): { center: Vec3; thinAxis: Vec3; size: Vec3 } | null {
   const bodies = _regen?.bodies ?? [];
   const pieces = bodies.filter((b) => b.featureId === featureId);
   if (!pieces.length) return null;
@@ -422,7 +423,7 @@ function bodyBox(featureId: string): { center: Vec3; thinAxis: Vec3 } | null {
   const sz = box.getSize(new THREE.Vector3());
   const thinAxis: Vec3 =
     sz.x <= sz.y && sz.x <= sz.z ? [1, 0, 0] : sz.y <= sz.z ? [0, 1, 0] : [0, 0, 1];
-  return { center: [c.x, c.y, c.z], thinAxis };
+  return { center: [c.x, c.y, c.z], thinAxis, size: [sz.x, sz.y, sz.z] };
 }
 
 /** Tooth count of the cog that produced a body (extrude → sketch → cog), if any. */
@@ -500,10 +501,52 @@ export function addLinkCmd() {
   useStore.getState().addLink(l);
 }
 
-/** Delete the currently selected joint or link in Assembly mode. */
+/** Add a pin-slot joint on the selected body (the slot body). Seeds the slot
+ *  endpoints along the body's longest bounding-box axis; the pin body + pin
+ *  point and slide limits are configured in the editor afterwards. */
+export function addPinSlotCmd() {
+  const s = useStore.getState();
+  if (s.mode !== 'assembly') s.enterAssembly();
+  const sel = useStore.getState().doc.features.find((f) => f.id === s.selectedFeatureId);
+  if (!sel || sel.type === 'sketch') {
+    dialogService.showAlert({
+      title: 'Pin-slot Joint',
+      message: 'Select the body that carries the slot (e.g. the leg) first, then add a pin-slot.',
+      mode: 'warning',
+    });
+    return;
+  }
+  const box = bodyBox(sel.id);
+  let slotA: Vec3 = [0, 0, 0];
+  let slotB: Vec3 = [0, 0, 0];
+  if (box) {
+    const { center, size } = box;
+    const ax = size[0] >= size[1] && size[0] >= size[2] ? 0 : size[1] >= size[2] ? 1 : 2;
+    const half = size[ax] * 0.35;
+    slotA = [...center] as Vec3;
+    slotB = [...center] as Vec3;
+    slotA[ax] -= half;
+    slotB[ax] += half;
+  }
+  const ps: PinSlotJoint = {
+    id: uid(),
+    name: nextAssemblyName([...s.doc.joints, ...(s.doc.pinSlots ?? [])], 'Pin-slot'),
+    type: 'pinslot',
+    slotFeatureId: sel.id,
+    slotA,
+    slotB,
+    pinFeatureId: '',
+    pin: [0, 0, 0],
+    limits: { mode: 'free' },
+  };
+  useStore.getState().addPinSlot(ps);
+}
+
+/** Delete the currently selected joint, link, or pin-slot in Assembly mode. */
 export function deleteAssemblyCmd() {
   const s = useStore.getState();
-  if (s.assembly.selectedLinkId) s.removeLink(s.assembly.selectedLinkId);
+  if (s.assembly.selectedPinSlotId) s.removePinSlot(s.assembly.selectedPinSlotId);
+  else if (s.assembly.selectedLinkId) s.removeLink(s.assembly.selectedLinkId);
   else if (s.assembly.selectedJointId) s.removeJoint(s.assembly.selectedJointId);
 }
 

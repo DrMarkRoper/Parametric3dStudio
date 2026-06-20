@@ -609,7 +609,7 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
           children: root.children.map((c): MenuItem => {
             // Enter only outside assembly; everything else only inside it.
             if (c.id === 'as-enter') return { ...c, disabled: inAssembly };
-            if (['as-exit', 'as-revolute', 'as-prismatic', 'as-link'].includes(c.id)) {
+            if (['as-exit', 'as-revolute', 'as-prismatic', 'as-link', 'as-pinslot'].includes(c.id)) {
               return { ...c, disabled: !inAssembly };
             }
             return c;
