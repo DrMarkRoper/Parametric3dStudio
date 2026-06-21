@@ -468,14 +468,19 @@ Visibility rules in the bridge:
 The menu bar (`public/data/menus/main_menu.json`) mirrors the actions:
 
 - **File**: New (Ctrl+Shift+N), Open (Ctrl+Shift+O), Save (Ctrl+Shift+S),
-  **Save Project As…** (Ctrl+Shift+A) · Export as STL…
+  **Save Project As…** (Ctrl+Shift+A) · **Application Settings…**
+  (`studio:appSettings` — stub for now) · **Project Details…**
+  (`studio:projectDetails` — opens the Save-As modal to edit `projectMeta`
+  name/description in place, no file write; name blank when unsaved) · Export as STL…
 - **Edit**: Undo, Redo
 - **Create**: Cube, Sphere, Cylinder, Cone, Torus, **Custom ▸** (Bulb screw,
   Bulb socket, Screw thread, Nut thread) · Import STL · Extrude · Move, Rotate,
-  Merge (in sketch mode this is replaced wholesale with the sketch tools list
-  — see §4.5; the model-mode Custom submenu is menu-only by design, like the
-  sketch-mode Cog — the toolbar `tb-create` block intentionally stays at the
-  five always-available primitives)
+  Merge · **Advanced ▸** (Re-select Profiles… / Use All Profiles — operate on the
+  selected extrude; disabled-state set by `useSketchAwareMenu` from the selection;
+  these replaced the old buttons in the extrude Info panel) (in sketch mode the
+  whole Create menu is replaced with the sketch tools list — see §4.5; the
+  model-mode submenus are menu-only by design — the toolbar `tb-create` block
+  intentionally stays at the five always-available primitives)
 - **Sketch**: Top / Front / Right / On Face · Finish Sketch (axis & face are
   disabled while in sketch mode; Finish is disabled in model mode)
 - **Assembly**: Enter / Exit Assembly Mode · Add Revolute Joint, Add Prismatic

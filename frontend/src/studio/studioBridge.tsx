@@ -152,6 +152,43 @@ export function saveProjectAsCmd() {
   });
 }
 
+/**
+ * Open the project metadata editor (name / description) — the same modal as
+ * Save As, but it only edits the stored `projectMeta` in place (no file write).
+ * Name starts blank for an unsaved project. Marks the doc dirty so the change is
+ * reflected in the title bar and captured on the next save.
+ */
+export function projectDetailsCmd() {
+  const meta = useStore.getState().projectMeta;
+  actionRegistry.invoke('studio:_openSaveModal', {
+    title: 'Project Details',
+    props: {
+      name: meta.name ?? '',
+      description: meta.description ?? '',
+      createdAt: meta.createdAt ?? null,
+      onSave: (next: { name: string; description: string }) => {
+        const cur = useStore.getState().projectMeta;
+        useStore.getState().setProjectMeta({
+          name: next.name.trim() || null,
+          description: next.description,
+          createdAt: cur.createdAt,
+          modifiedAt: cur.modifiedAt,
+        });
+        useStore.setState({ dirty: true });
+      },
+    },
+  });
+}
+
+/** Placeholder for the upcoming application-settings dialog. */
+export function appSettingsCmd() {
+  dialogService.showAlert({
+    title: 'Application Settings',
+    message: 'Application settings are coming soon.',
+    mode: 'info',
+  });
+}
+
 /** Confirm Save / Discard / Cancel when there are unsaved changes; calls `proceed` if it's safe to continue. */
 function confirmDiscardIfDirty(intent: 'new project' | 'open project', proceed: () => void) {
   const s = useStore.getState();

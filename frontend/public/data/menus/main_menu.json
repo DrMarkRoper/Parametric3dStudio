@@ -2,10 +2,14 @@
   {
     "id": "menu-file", "label": "File", "visible": true, "disabled": false,
     "children": [
+      { "id": "file-app-settings", "type": "action", "label": "Application Settings…", "icon": "⚙️", "action": "studio:appSettings", "visible": true, "disabled": false, "children": [] },
+      { "id": "file-sep-top", "type": "separator" },
       { "id": "file-new",     "type": "action", "label": "New Project",       "icon": "📄", "shortcut": "Ctrl+Shift+N", "shortcutKey": { "ctrl": true, "shift": true, "key": "n" }, "action": "studio:new",      "visible": true, "disabled": false, "children": [] },
       { "id": "file-open",    "type": "action", "label": "Open Project…",     "icon": "📂", "shortcut": "Ctrl+Shift+O", "shortcutKey": { "ctrl": true, "shift": true, "key": "o" }, "action": "studio:open",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save",    "type": "action", "label": "Save Project",      "icon": "💾", "shortcut": "Ctrl+Shift+S", "shortcutKey": { "ctrl": true, "shift": true, "key": "s" }, "action": "studio:save",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save-as", "type": "action", "label": "Save Project As…",  "icon": "💾", "shortcut": "Ctrl+Shift+A", "shortcutKey": { "ctrl": true, "shift": true, "key": "a" }, "action": "studio:saveAs",   "visible": true, "disabled": false, "children": [] },
+      { "id": "file-sep-0", "type": "separator" },
+      { "id": "file-project-details", "type": "action", "label": "Project Details…",   "icon": "📝", "action": "studio:projectDetails", "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-1", "type": "separator" },
       { "id": "file-export",  "type": "action", "label": "Export as STL…",    "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:exportStl", "visible": true, "disabled": false, "children": [] }
     ]
@@ -43,7 +47,17 @@
       { "id": "cr-sep-2", "type": "separator" },
       { "id": "cr-move",     "type": "action", "label": "Move",     "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M8 1.7 L8 14.3'/><path d='M1.7 8 L14.3 8'/><path d='M5.5 4 L8 1.5 L10.5 4'/><path d='M5.5 12 L8 14.5 L10.5 12'/><path d='M4 5.5 L1.5 8 L4 10.5'/><path d='M12 5.5 L14.5 8 L12 10.5'/></svg>", "action": "studio:move", "visible": true, "disabled": false, "children": [] },
       { "id": "cr-rotate",   "type": "action", "label": "Rotate",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M3.4 8 A4.6 4.6 0 1 1 8 12.6'/><path d='M5.2 12.6 L8 12.6 L8 9.8'/></svg>", "action": "studio:rotate", "visible": true, "disabled": false, "children": [] },
-      { "id": "cr-merge",    "type": "action", "label": "Merge",    "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' width='14' height='14'><circle cx='6' cy='8' r='3.6'/><circle cx='10' cy='8' r='3.6'/></svg>", "action": "studio:merge", "visible": true, "disabled": false, "children": [] }
+      { "id": "cr-merge",    "type": "action", "label": "Merge",    "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' width='14' height='14'><circle cx='6' cy='8' r='3.6'/><circle cx='10' cy='8' r='3.6'/></svg>", "action": "studio:merge", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-sep-adv", "type": "separator" },
+      {
+        "id": "cr-advanced", "type": "submenu", "label": "Advanced",
+        "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><circle cx='8' cy='8' r='2.2'/><path d='M8 1.6 V3.4 M8 12.6 V14.4 M1.6 8 H3.4 M12.6 8 H14.4 M3.5 3.5 L4.8 4.8 M11.2 11.2 L12.5 12.5 M12.5 3.5 L11.2 4.8 M4.8 11.2 L3.5 12.5'/></svg>",
+        "visible": true, "disabled": false,
+        "children": [
+          { "id": "cr-adv-reselect", "type": "action", "label": "Re-select Profiles…", "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='3' y='3' width='10' height='10' rx='1'/><path d='M6 8 L7.3 9.3 L10 6'/></svg>", "action": "studio:extrude:reselect", "visible": true, "disabled": true, "children": [] },
+          { "id": "cr-adv-reset",    "type": "action", "label": "Use All Profiles",    "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='3' y='3' width='10' height='10' rx='1'/><path d='M5.5 8 H10.5'/></svg>", "action": "studio:extrude:resetProfiles", "visible": true, "disabled": true, "children": [] }
+        ]
+      }
     ]
   },
   {

@@ -29,7 +29,7 @@ import { BOLT_PRESETS, BULB_PRESETS, THREAD_SHAPES, isEdisonThread } from '../ty
 import { importCache, nextName, uid, useStore, type DynamicOp } from '../state/store';
 import { tryEval, type Params } from '../core/expressions';
 import { isLoopSolvedJoint, linkKind, resolvedRange, teethRatio, type Range } from '../core/assembly';
-import { cogTeethForFeature, reselectExtrudeFaces, resetExtrudeProfiles } from '../studioBridge';
+import { cogTeethForFeature } from '../studioBridge';
 import type { BodyOut } from '../core/buildGeometry';
 import { dist2d, entitiesBounds, modColor, modsForEntity, rectCorners, resolveDimAnchor, rotateEntitiesInSketch, translateEntitiesInSketch, translateEntityInSketch } from '../core/sketchGeometry';
 import type { CornerMod } from '../types';
@@ -471,25 +471,6 @@ function FeatureProps({ feature, params, bodies }: { feature: Feature; params: P
               ? `${feature.regionPts.length} selected region${feature.regionPts.length > 1 ? 's' : ''}`
               : 'All closed profiles in the sketch'}
           </div>
-        </div>
-        <div className="field-row" style={{ gap: 6 }}>
-          <button
-            className="mini"
-            style={{ flex: 1 }}
-            title="Re-pick which closed profiles this extrude uses (opens the sketch's face picker)"
-            onClick={() => reselectExtrudeFaces(feature.id)}
-          >
-            Re-select profiles…
-          </button>
-          <button
-            className="mini"
-            style={{ flex: 1 }}
-            disabled={!feature.regionPts?.length}
-            title="Clear the saved selection and extrude all top-level profiles (holes excluded). Repairs a stale selection from an older file."
-            onClick={() => resetExtrudeProfiles(feature.id)}
-          >
-            Use all profiles
-          </button>
         </div>
         <EdgeControls
           edge={feature.edge}
@@ -1150,9 +1131,40 @@ function SketchProps({ sketch, params }: { sketch: SketchFeature; params: Params
   const constructionCount = sketch.entities.filter((e) =>
     'construction' in e && (e as { construction?: boolean }).construction,
   ).length;
+
+  // Editable sketch name (mirrors CommonHeader used in model mode).
+  const [nameText, setNameText] = useState(sketch.name);
+  useEffect(() => setNameText(sketch.name), [sketch.name]);
+  const trimmed = nameText.trim();
+  const duplicate = s.doc.features.some((f) => f.id !== sketch.id && f.name.trim() === trimmed);
+  const invalidName = !trimmed || duplicate;
+  const commitName = () => {
+    if (!invalidName && trimmed !== sketch.name) s.updateFeature(sketch.id, (f) => ({ ...f, name: trimmed }));
+    else if (invalidName) setNameText(sketch.name);
+  };
+
   return (
     <>
-      <div className="props-title">SKETCH: {sketch.name}</div>
+      <div className="props-title">SKETCH</div>
+      <div className="field">
+        <span className="flabel">Name</span>
+        <input
+          className={invalidName ? 'invalid' : ''}
+          value={nameText}
+          title={duplicate ? 'Another feature already has this name' : !trimmed ? 'Name cannot be empty' : sketch.name}
+          onChange={(e) => setNameText(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Escape') setNameText(sketch.name);
+          }}
+        />
+        {invalidName && (
+          <div className="hint" style={{ color: 'var(--error)' }}>
+            {duplicate ? 'Name already in use — will revert' : 'Name cannot be empty — will revert'}
+          </div>
+        )}
+      </div>
       <button
         onClick={() => s.exitSketch()}
         style={{ width: '100%', marginBottom: 10 }}

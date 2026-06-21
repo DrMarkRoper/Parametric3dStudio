@@ -17,6 +17,10 @@ import {
   addLinkCmd,
   addPinSlotCmd,
   addPrimitive,
+  appSettingsCmd,
+  projectDetailsCmd,
+  reselectExtrudeFaces,
+  resetExtrudeProfiles,
   cancelFacePick,
   cancelMerge,
   createMerge,
@@ -62,6 +66,16 @@ export function useStudioActions() {
       'studio:open': () => openProjectCmd(),
       'studio:save': () => saveProjectCmd(),
       'studio:saveAs': () => saveProjectAsCmd(),
+      'studio:projectDetails': () => projectDetailsCmd(),
+      'studio:appSettings': () => appSettingsCmd(),
+      'studio:extrude:reselect': () => {
+        const id = useStore.getState().selectedFeatureId;
+        if (id) reselectExtrudeFaces(id);
+      },
+      'studio:extrude:resetProfiles': () => {
+        const id = useStore.getState().selectedFeatureId;
+        if (id) resetExtrudeProfiles(id);
+      },
       // Internal: opens the SaveProjectModal with its Save/Cancel button bar
       'studio:_openSaveModal': (args) => {
         dispatch({

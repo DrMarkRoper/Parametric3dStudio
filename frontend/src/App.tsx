@@ -578,15 +578,36 @@ const SKETCH_MENU_CHILDREN: MenuItem[] = [
 
 function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
   const mode = useStore((s) => s.mode);
+  const selectedFeatureId = useStore((s) => s.selectedFeatureId);
+  const features = useStore((s) => s.doc.features);
   return useMemo<MenuRootItem[]>(() => {
     const inSketch = mode === 'sketch';
     const inAssembly = mode === 'assembly';
+    // Advanced ▸ extrude-profile items enable only for a selected extrude.
+    const sel = features.find((f) => f.id === selectedFeatureId);
+    const isExtrude = sel?.type === 'extrude';
+    const hasRegions = isExtrude && Array.isArray((sel as { regionPts?: unknown[] }).regionPts)
+      && ((sel as { regionPts?: unknown[] }).regionPts?.length ?? 0) > 0;
     return baseMenu.map((root): MenuRootItem => {
       if (root.id === 'menu-create') {
         // Swap the Create menu's contents wholesale while sketching; disable it
         // entirely while assembling (the model tree is frozen).
         if (inSketch) return { ...root, children: SKETCH_MENU_CHILDREN };
-        return { ...root, disabled: inAssembly };
+        return {
+          ...root,
+          disabled: inAssembly,
+          children: root.children.map((c): MenuItem => {
+            if (c.id !== 'cr-advanced') return c;
+            return {
+              ...c,
+              children: (c.children ?? []).map((ch): MenuItem => {
+                if (ch.id === 'cr-adv-reselect') return { ...ch, disabled: !isExtrude };
+                if (ch.id === 'cr-adv-reset') return { ...ch, disabled: !hasRegions };
+                return ch;
+              }),
+            };
+          }),
+        };
       }
       if (root.id === 'menu-sketch') {
         return {
@@ -618,7 +639,7 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
       }
       return root;
     });
-  }, [baseMenu, mode]);
+  }, [baseMenu, mode, selectedFeatureId, features]);
 }
 
 // ── Inner app (rendered inside AppStateProvider) ─────────────────────────
