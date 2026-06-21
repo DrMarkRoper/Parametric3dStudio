@@ -8,6 +8,7 @@
       { "id": "file-open",    "type": "action", "label": "Open Project…",     "icon": "📂", "shortcut": "Ctrl+Shift+O", "shortcutKey": { "ctrl": true, "shift": true, "key": "o" }, "action": "studio:open",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save",    "type": "action", "label": "Save Project",      "icon": "💾", "shortcut": "Ctrl+Shift+S", "shortcutKey": { "ctrl": true, "shift": true, "key": "s" }, "action": "studio:save",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save-as", "type": "action", "label": "Save Project As…",  "icon": "💾", "shortcut": "Ctrl+Shift+A", "shortcutKey": { "ctrl": true, "shift": true, "key": "a" }, "action": "studio:saveAs",   "visible": true, "disabled": false, "children": [] },
+      { "id": "file-download", "type": "action", "label": "Download",          "icon": "⬇", "action": "studio:save",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-0", "type": "separator" },
       { "id": "file-project-details", "type": "action", "label": "Project Details…",   "icon": "📝", "action": "studio:projectDetails", "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-1", "type": "separator" },

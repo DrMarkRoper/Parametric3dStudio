@@ -11,6 +11,15 @@ import {
   unregisterDialogController,
 } from '../utils/dialogService';
 import type { DialogController, DialogMode, InputFieldType, InputWidgetType, SelectOption } from '../utils/dialogService';
+import {
+  DEFAULT_APPLICATION_ID,
+  checkConnection,
+  loadVfsConfig,
+  saveVfsConfig,
+  type ConnectionResult,
+} from '../vfs/vfsClient';
+import { ProjectDetailsModal } from './panels/ProjectDetailsModal';
+import { AddRootModal } from './panels/AddRootModal';
 
 // ── Button bar ─────────────────────────────────────────────────────────────
 
@@ -706,6 +715,101 @@ function SaveProjectModal({ modal, onClose }: { modal: ModalState; onClose: () =
   );
 }
 
+// ── AppSettingsModal ───────────────────────────────────────────────────────
+//
+// VFS connection settings (step 1 of the VFS integration). Collects the server
+// address + application id, persists them via the vfsClient, and offers a live
+// "Test connection" probe that reports pass / failure inline. The button bar's
+// Save action (appSettingsModal:save) writes the values to storage.
+
+function AppSettingsModal({ onClose }: { modal: ModalState; onClose: () => void }) {
+  const initial = loadVfsConfig();
+  const [serverUrl, setServerUrl] = useState(initial.serverUrl);
+  const [applicationId, setApplicationId] = useState(
+    initial.applicationId || DEFAULT_APPLICATION_ID,
+  );
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<ConnectionResult | null>(null);
+
+  const formRef = useRef({ serverUrl, applicationId });
+  useEffect(() => { formRef.current = { serverUrl, applicationId }; });
+
+  // Persist on Save (invoked by the button bar).
+  useEffect(() => {
+    actionRegistry.register('appSettingsModal:save', () => {
+      saveVfsConfig(formRef.current);
+      onClose();
+    });
+    return () => actionRegistry.unregister('appSettingsModal:save');
+  // onClose is stable for the lifetime of the modal
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const runTest = useCallback(async () => {
+    setTesting(true);
+    setResult(null);
+    try {
+      const r = await checkConnection(formRef.current);
+      setResult(r);
+    } catch {
+      setResult({ ok: false, message: 'Connection test failed unexpectedly.' });
+    } finally {
+      setTesting(false);
+    }
+  }, []);
+
+  return (
+    <div className="modal-content-pad" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="dialog-field" style={{ marginTop: 0 }}>
+        <label className="dialog-field-label">Server address *</label>
+        <input
+          className="dialog-input"
+          value={serverUrl}
+          onChange={e => { setServerUrl(e.target.value); setResult(null); }}
+          placeholder="http://localhost:5000"
+          autoFocus
+        />
+      </div>
+
+      <div className="dialog-field" style={{ marginTop: 0 }}>
+        <label className="dialog-field-label">Application id *</label>
+        <input
+          className="dialog-input"
+          value={applicationId}
+          onChange={e => { setApplicationId(e.target.value); setResult(null); }}
+          placeholder={DEFAULT_APPLICATION_ID}
+        />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          type="button"
+          className="modal-btn"
+          onClick={runTest}
+          disabled={testing || !serverUrl.trim() || !applicationId.trim()}
+        >
+          {testing ? 'Testing…' : 'Test connection'}
+        </button>
+        {result && (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: result.ok ? 'var(--accent, #3a9d4a)' : 'var(--danger, #d3534f)',
+            }}
+          >
+            {result.ok ? '✓ ' : '✕ '}{result.message}
+          </span>
+        )}
+      </div>
+
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
+        These settings are saved locally and used to connect to the Virtual File System server.
+      </p>
+    </div>
+  );
+}
+
 // ── Registry ───────────────────────────────────────────────────────────────
 
 const MODAL_REGISTRY: Record<string, ModalComponent> = {
@@ -715,6 +819,9 @@ const MODAL_REGISTRY: Record<string, ModalComponent> = {
   ConfirmDialog,
   InputDialog,
   SaveProjectModal,
+  AppSettingsModal,
+  ProjectDetailsModal,
+  AddRootModal,
 };
 
 // ── Individual modal dialog ────────────────────────────────────────────────

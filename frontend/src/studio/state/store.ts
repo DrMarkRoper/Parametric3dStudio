@@ -30,19 +30,45 @@ export interface DimensionDraft {
   p2: Vec2 | null;
 }
 
-/** Project file metadata (name / description / dates), stored alongside the Doc but outside undo/redo. */
+/**
+ * Generate an RFC-4122 v4 UUID for a project's stable identity (used as the
+ * VFS config / "topic" key). Prefers crypto.randomUUID, with a non-crypto
+ * fallback for environments that lack it.
+ */
+export const newProjectId = (): string => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* fall through to manual generation */
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+/** Project file metadata (id / name / description / dates), stored alongside the Doc but outside undo/redo. */
 export interface ProjectMeta {
+  /** Stable UUID identity for this project (also the VFS config key). */
+  projectId: string;
   name: string | null;
   description: string;
   createdAt: string | null;  // ISO timestamp; null until first save
   modifiedAt: string | null; // ISO timestamp; null until first save
+  /** VFS root id this project saves to by default. null until a root exists. */
+  defaultRootId: string | null;
 }
 
 export const emptyProjectMeta = (): ProjectMeta => ({
+  projectId: newProjectId(),
   name: null,
   description: '',
   createdAt: null,
   modifiedAt: null,
+  defaultRootId: null,
 });
 
 export interface DynamicOp {

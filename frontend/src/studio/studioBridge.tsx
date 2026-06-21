@@ -117,10 +117,12 @@ export function saveProjectCmd() {
   const doSave = (next: { name: string; description: string }) => {
     const now = new Date().toISOString();
     const updated: ProjectMeta = {
+      projectId: meta.projectId,
       name: next.name.trim(),
       description: next.description,
       createdAt: meta.createdAt ?? now,
       modifiedAt: now,
+      defaultRootId: meta.defaultRootId,
     };
     saveProject(useStore.getState().doc, projectFileName(updated.name), updated);
     useStore.getState().setProjectMeta(updated);
@@ -141,10 +143,12 @@ export function saveProjectAsCmd() {
   openSaveProjectDialog(true, meta, (next) => {
     const now = new Date().toISOString();
     const updated: ProjectMeta = {
+      projectId: meta.projectId,
       name: next.name.trim(),
       description: next.description,
       createdAt: meta.createdAt ?? now,
       modifiedAt: now,
+      defaultRootId: meta.defaultRootId,
     };
     saveProject(useStore.getState().doc, projectFileName(updated.name), updated);
     useStore.getState().setProjectMeta(updated);
@@ -153,40 +157,22 @@ export function saveProjectAsCmd() {
 }
 
 /**
- * Open the project metadata editor (name / description) — the same modal as
- * Save As, but it only edits the stored `projectMeta` in place (no file write).
- * Name starts blank for an unsaved project. Marks the doc dirty so the change is
- * reflected in the title bar and captured on the next save.
+ * Open the Project Details editor — a tabbed dialog. The General tab edits the
+ * stored `projectMeta` in place (project id, name, description; no file write),
+ * the VFS Roots tab manages the VFS roots for this project's id. Name starts
+ * blank for an unsaved project. General edits mark the doc dirty so the change
+ * is reflected in the title bar and captured on the next save.
  */
 export function projectDetailsCmd() {
-  const meta = useStore.getState().projectMeta;
-  actionRegistry.invoke('studio:_openSaveModal', {
-    title: 'Project Details',
-    props: {
-      name: meta.name ?? '',
-      description: meta.description ?? '',
-      createdAt: meta.createdAt ?? null,
-      onSave: (next: { name: string; description: string }) => {
-        const cur = useStore.getState().projectMeta;
-        useStore.getState().setProjectMeta({
-          name: next.name.trim() || null,
-          description: next.description,
-          createdAt: cur.createdAt,
-          modifiedAt: cur.modifiedAt,
-        });
-        useStore.setState({ dirty: true });
-      },
-    },
-  });
+  actionRegistry.invoke('studio:_openProjectDetails');
 }
 
-/** Placeholder for the upcoming application-settings dialog. */
+/**
+ * Open the Application Settings dialog. Currently hosts the VFS connection
+ * settings (server address + application id) with a live Test Connection probe.
+ */
 export function appSettingsCmd() {
-  dialogService.showAlert({
-    title: 'Application Settings',
-    message: 'Application settings are coming soon.',
-    mode: 'info',
-  });
+  actionRegistry.invoke('studio:_openAppSettings');
 }
 
 /** Confirm Save / Discard / Cancel when there are unsaved changes; calls `proceed` if it's safe to continue. */
@@ -205,10 +191,12 @@ function confirmDiscardIfDirty(intent: 'new project' | 'open project', proceed: 
         const doSaveAndProceed = (next: { name: string; description: string }) => {
           const now = new Date().toISOString();
           const updated: ProjectMeta = {
+            projectId: meta.projectId,
             name: next.name.trim(),
             description: next.description,
             createdAt: meta.createdAt ?? now,
             modifiedAt: now,
+            defaultRootId: meta.defaultRootId,
           };
           saveProject(useStore.getState().doc, projectFileName(updated.name), updated);
           useStore.getState().setProjectMeta(updated);

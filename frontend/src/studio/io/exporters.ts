@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import type { Doc, ImportFeature, SnapMode } from '../types';
 import type { BodyOut } from '../core/buildGeometry';
-import { emptyProjectMeta, importCache, type ProjectMeta } from '../state/store';
+import { emptyProjectMeta, newProjectId, importCache, type ProjectMeta } from '../state/store';
 
 function download(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -131,12 +131,17 @@ export async function loadProject(file: File): Promise<{ doc: Doc; meta: Project
   const rawMeta = (data?.meta ?? {}) as Partial<ProjectMeta>;
   const fallbackName = file.name.replace(/\.(cad\.)?json$/i, '');
   const meta: ProjectMeta = {
+    // Files saved before project ids existed get a fresh one, ready for the next save.
+    projectId: typeof rawMeta.projectId === 'string' && rawMeta.projectId.trim()
+      ? rawMeta.projectId
+      : newProjectId(),
     name: typeof rawMeta.name === 'string' && rawMeta.name.trim()
       ? rawMeta.name
       : fallbackName || null,
     description: typeof rawMeta.description === 'string' ? rawMeta.description : '',
     createdAt: typeof rawMeta.createdAt === 'string' ? rawMeta.createdAt : null,
     modifiedAt: typeof rawMeta.modifiedAt === 'string' ? rawMeta.modifiedAt : null,
+    defaultRootId: typeof rawMeta.defaultRootId === 'string' ? rawMeta.defaultRootId : null,
   };
 
   return { doc: loadedDoc, meta };

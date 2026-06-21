@@ -93,6 +93,55 @@ export function useStudioActions() {
           },
         });
       },
+      // Internal: opens the Application Settings (VFS connection) modal
+      'studio:_openAppSettings': () => {
+        dispatch({
+          type: 'OPEN_MODAL',
+          modal: {
+            title: 'Application Settings',
+            componentType: 'AppSettingsModal',
+            width: 480,
+            allowClose: true,
+            buttons: [
+              { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
+              { label: 'Save', alignment: 'right', variant: 'primary', action: 'appSettingsModal:save', closesModal: false, keys: ['Enter'] },
+            ],
+          },
+        });
+      },
+      // Internal: opens the tabbed Project Details modal (General + VFS Roots)
+      'studio:_openProjectDetails': () => {
+        dispatch({
+          type: 'OPEN_MODAL',
+          modal: {
+            title: 'Project Details',
+            componentType: 'ProjectDetailsModal',
+            width: 560,
+            allowClose: true,
+            buttons: [
+              { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
+              { label: 'Save', alignment: 'right', variant: 'primary', action: 'projectDetailsModal:save', closesModal: true, keys: ['Enter'] },
+            ],
+          },
+        });
+      },
+      // Internal: opens the "Add root folder" modal (props carry projectId + onCreated)
+      'studio:_openAddRoot': (args) => {
+        dispatch({
+          type: 'OPEN_MODAL',
+          modal: {
+            title: 'Add root folder',
+            componentType: 'AddRootModal',
+            width: 520,
+            allowClose: true,
+            props: args?.props as Record<string, unknown> | undefined,
+            buttons: [
+              { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
+              { label: 'Create', alignment: 'right', variant: 'primary', action: 'addRootModal:create', closesModal: 'on-success' },
+            ],
+          },
+        });
+      },
       'studio:import': () => fileTriggers.importModel?.(),
       'studio:exportStl': () => exportStlCmd(),
       'studio:undo': () => undoCmd(),
