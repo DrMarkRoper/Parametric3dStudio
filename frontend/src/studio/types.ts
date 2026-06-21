@@ -385,6 +385,18 @@ export interface Link {
   phase?: string;
 }
 
+/* ---------- Feature tree (panel presentation only) ---------- */
+
+/** A collapsible group in the Features panel. Purely organisational — it does
+ *  NOT change `features` order or regeneration; `children` lists the feature ids
+ *  shown under it, in display order. */
+export interface FeatureCategory {
+  id: string;
+  name: string;
+  collapsed: boolean;
+  children: string[];
+}
+
 /* ---------- Document ---------- */
 
 export interface Doc {
@@ -398,6 +410,11 @@ export interface Doc {
   links: Link[];
   /** Pin-slot joints (Assembly mode closed loops). Optional for legacy files. */
   pinSlots: PinSlotJoint[];
+  /** Features-panel groups (presentation only). Optional for legacy files. */
+  categories: FeatureCategory[];
+  /** Ordered root items of the features tree — category ids and root-level
+   *  feature ids. Optional; missing/extra ids are reconciled at render time. */
+  rootOrder: string[];
 }
 
 export const emptyDoc = (): Doc => ({
@@ -408,6 +425,8 @@ export const emptyDoc = (): Doc => ({
   joints: [],
   links: [],
   pinSlots: [],
+  categories: [],
+  rootOrder: [],
 });
 
 export const uid = (): string => Math.random().toString(36).slice(2, 10);

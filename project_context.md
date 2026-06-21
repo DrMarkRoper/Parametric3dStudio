@@ -301,7 +301,7 @@ are made directly — wrap or extend from the bridge / panel layer otherwise.
 
 | componentType | Wraps | Tab / title | Notes |
 |---|---|---|---|
-| `FeaturesPanel` | studio `SidePanel` | `Features` | Features + Parameters tabs; SVG eye-open / closed-eye / × glyphs sized 22×22; bulk-visibility row at top (Hide/Show all · sketches · objects — toggles by group) |
+| `FeaturesPanel` | studio `SidePanel` | `Features` | Features + Parameters tabs; SVG eye-open / closed-eye / × glyphs; bulk-visibility row (Hide/Show all · sketches · objects); **category tree** — "+ Add category", collapsible groups, HTML5 drag-drop to move features into a category / reorder within a category or root. Tree is **presentation-only** (`Doc.categories` + `Doc.rootOrder`, reconciled by `featureTree(doc)`); it never reorders the `features` array, so regen order / booleans are unaffected. |
 | `CanvasPanel` | studio `Viewport` + `StudioFileInputs` | `Canvas` | 3D view + hidden file inputs (no per-panel status strip — see §4.4) |
 | `InfoPanel` | studio `PropertiesPanel` | `Info` | Context-sensitive properties + Measurement readout + Dimension editor |
 | `JointsPanel` | `AssemblyJointsSection` (in PropertiesPanel) | `Joints` | Assembly-mode tab — joints list + selected-joint editor + warnings |

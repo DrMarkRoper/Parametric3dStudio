@@ -122,6 +122,8 @@ export async function loadProject(file: File): Promise<{ doc: Doc; meta: Project
     joints: Array.isArray(doc.joints) ? doc.joints : [],
     links: Array.isArray(doc.links) ? doc.links : [],
     pinSlots: Array.isArray(doc.pinSlots) ? doc.pinSlots : [],
+    categories: Array.isArray(doc.categories) ? doc.categories : [],
+    rootOrder: Array.isArray(doc.rootOrder) ? doc.rootOrder : [],
   };
 
   // Project meta — older files may not have a meta field; fill with defaults

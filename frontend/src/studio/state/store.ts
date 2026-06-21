@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
-import { emptyDoc, uid, type Doc, type Feature, type Joint, type Link, type Parameter, type PinSlotJoint, type SketchFeature, type SnapMode, type Vec2 } from '../types';
+import { emptyDoc, uid, type Doc, type Feature, type FeatureCategory, type Joint, type Link, type Parameter, type PinSlotJoint, type SketchFeature, type SnapMode, type Vec2 } from '../types';
 import { cycleWarnings, propagate, solveBodyTransforms } from '../core/assembly';
 import { resolveParameters, tryEval } from '../core/expressions';
 
@@ -151,6 +151,14 @@ interface State {
   addFeature: (f: Feature, select?: boolean) => void;
   updateFeature: (id: string, fn: (f: Feature) => Feature, undoable?: boolean) => void;
   deleteFeature: (id: string) => void;
+
+  // ── Features-panel category tree (presentation only) ──────────────────────
+  addCategory: (name: string) => void;
+  updateCategory: (id: string, fn: (c: FeatureCategory) => FeatureCategory) => void;
+  removeCategory: (id: string) => void;
+  /** Move a feature or category to a target position: into `intoCategoryId`
+   *  (or root when null), before `beforeId` (or at the end when null). */
+  moveTreeItem: (dragId: string, intoCategoryId: string | null, beforeId: string | null) => void;
 
   setParameters: (parameters: Parameter[]) => void;
   setGrid: (gridSize: number) => void;
@@ -317,6 +325,56 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({ past: [...s.past.slice(-49), prev], future: [] }));
   },
 
+  addCategory(name) {
+    const d = get().doc;
+    const { categories, rootOrder } = featureTree(d);
+    const id = `cat_${uid()}`;
+    get().setDoc({
+      ...d,
+      categories: [...categories, { id, name, collapsed: false, children: [] }],
+      rootOrder: [...rootOrder, id],
+    });
+  },
+
+  updateCategory(id, fn) {
+    const d = get().doc;
+    get().setDoc({ ...d, categories: (d.categories ?? []).map((c) => (c.id === id ? fn(c) : c)) }, false);
+  },
+
+  removeCategory(id) {
+    const d = get().doc;
+    const { categories, rootOrder } = featureTree(d);
+    const cat = categories.find((c) => c.id === id);
+    if (!cat) return;
+    const idx = rootOrder.indexOf(id);
+    const newRoot = [...rootOrder];
+    // replace the category in the root order with its (now ungrouped) children
+    if (idx >= 0) newRoot.splice(idx, 1, ...cat.children);
+    get().setDoc({ ...d, categories: categories.filter((c) => c.id !== id), rootOrder: newRoot });
+  },
+
+  moveTreeItem(dragId, intoCategoryId, beforeId) {
+    const d = get().doc;
+    const { categories, rootOrder } = featureTree(d);
+    const isCat = categories.some((c) => c.id === dragId);
+    if (isCat && intoCategoryId) return; // categories live only at root
+    // remove the dragged id from wherever it is
+    let root = rootOrder.filter((rid) => rid !== dragId);
+    const cats = categories.map((c) => ({ ...c, children: c.children.filter((fid) => fid !== dragId) }));
+    if (intoCategoryId) {
+      const c = cats.find((x) => x.id === intoCategoryId);
+      if (!c) return;
+      const at = beforeId ? c.children.indexOf(beforeId) : -1;
+      if (at >= 0) c.children.splice(at, 0, dragId);
+      else c.children.push(dragId);
+    } else {
+      const at = beforeId ? root.indexOf(beforeId) : -1;
+      if (at >= 0) root.splice(at, 0, dragId);
+      else root.push(dragId);
+    }
+    get().setDoc({ ...d, categories: cats, rootOrder: root });
+  },
+
   deleteFeature(id) {
     const d = get().doc;
     const dead = collectDead(d, id);
@@ -329,6 +387,9 @@ export const useStore = create<State>((set, get) => ({
       links: d.links.filter((l) => !deadJoints.has(l.driverJointId) && !deadJoints.has(l.drivenJointId)),
       // drop pin-slots whose slot or pin body was deleted
       pinSlots: (d.pinSlots ?? []).filter((ps) => !dead.has(ps.slotFeatureId) && !dead.has(ps.pinFeatureId)),
+      // strip deleted features from the panel tree
+      categories: (d.categories ?? []).map((c) => ({ ...c, children: c.children.filter((fid) => !dead.has(fid)) })),
+      rootOrder: (d.rootOrder ?? []).filter((rid) => !dead.has(rid)),
     });
     for (const k of dead) importCache.delete(k);
     set((s) => ({
@@ -612,6 +673,31 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({ assembly: { ...s.assembly, jointValues: candidate } }));
   },
 }));
+
+/**
+ * Reconcile the stored panel tree against the live features into a clean
+ * presentation tree: drops ids that no longer exist, de-dupes, ensures every
+ * category appears at root, and appends any ungrouped/new features at the end so
+ * the panel always shows everything regardless of how features were added.
+ */
+export function featureTree(doc: Doc): { categories: FeatureCategory[]; rootOrder: string[] } {
+  const featureIds = new Set(doc.features.map((f) => f.id));
+  const cats = (doc.categories ?? []).map((c) => ({
+    ...c,
+    children: c.children.filter((id) => featureIds.has(id)),
+  }));
+  const catIds = new Set(cats.map((c) => c.id));
+  const inCat = new Set<string>();
+  for (const c of cats) for (const id of c.children) inCat.add(id);
+
+  let root = (doc.rootOrder ?? []).filter(
+    (id) => catIds.has(id) || (featureIds.has(id) && !inCat.has(id)),
+  );
+  root = root.filter((id, i) => root.indexOf(id) === i); // de-dupe
+  for (const c of cats) if (!root.includes(c.id)) root.push(c.id);
+  for (const f of doc.features) if (!inCat.has(f.id) && !root.includes(f.id)) root.push(f.id);
+  return { categories: cats, rootOrder: root };
+}
 
 /** A feature plus everything that (transitively) depends on it. */
 export function collectDead(doc: Doc, id: string): Set<string> {

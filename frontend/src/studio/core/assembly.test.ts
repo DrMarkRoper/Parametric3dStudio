@@ -182,7 +182,7 @@ describe('pin-slot loop solver', () => {
   const Ow: [number, number, number] = [0, 0, 0];
   const crankHome: [number, number, number] = [0, 0, -10];
   const loopDoc = (limits?: { min: string; max: string }): Doc => ({
-    parameters: [], features: [], gridSize: 5, snap: 'grid', links: [],
+    parameters: [], features: [], gridSize: 5, snap: 'grid', links: [], categories: [], rootOrder: [],
     joints: [
       { id: 'jw', name: 'Wheel', featureId: 'wheel', type: 'revolute', origin: Ow, axis: [1, 0, 0], limits: { mode: 'free' } },
       { id: 'jleg', name: 'Leg pin', featureId: 'leg', type: 'revolute', origin: crankHome, axis: [1, 0, 0], limits: { mode: 'free' }, baseFeatureId: 'wheel' },

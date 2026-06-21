@@ -1,6 +1,7 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { uid, type Parameter } from '../types';
-import { confirmDeleteFeature, useStore } from '../state/store';
+import { confirmDeleteFeature, featureTree, useStore } from '../state/store';
+import type { Feature } from '../types';
 import { isValidParamName, type Params } from '../core/expressions';
 
 /** Parameter name editor: commits on blur/Enter, rejects invalid or duplicate names. */
@@ -149,6 +150,8 @@ export function SidePanel({
 
 function FeatureList({ featureErrors }: { featureErrors: { featureId: string; message: string }[] }) {
   const s = useStore();
+  const dragId = useRef<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const errorFor = (id: string) => featureErrors.find((e) => e.featureId === id)?.message;
   if (!s.doc.features.length) {
     return (
@@ -160,7 +163,7 @@ function FeatureList({ featureErrors }: { featureErrors: { featureId: string; me
       </div>
     );
   }
-  const setVis = (pred: (f: typeof s.doc.features[number]) => boolean, visible: boolean) =>
+  const setVis = (pred: (f: Feature) => boolean, visible: boolean) =>
     s.setDoc({ ...s.doc, features: s.doc.features.map((f) => (pred(f) ? { ...f, visible } : f)) });
   const sketches = s.doc.features.filter((f) => f.type === 'sketch');
   const objects = s.doc.features.filter((f) => f.type !== 'sketch');
@@ -169,88 +172,216 @@ function FeatureList({ featureErrors }: { featureErrors: { featureId: string; me
   const anyObjVis = objects.some((f) => f.visible);
   const bulkBtn: CSSProperties = { flex: 1, fontSize: 11, padding: '3px 4px', whiteSpace: 'nowrap' };
 
+  const tree = featureTree(s.doc);
+  const featureById = new Map(s.doc.features.map((f) => [f.id, f] as const));
+  const catById = new Map(tree.categories.map((c) => [c.id, c] as const));
+  const containerOf = (fid: string) => tree.categories.find((c) => c.children.includes(fid))?.id ?? null;
+
+  // ── drag & drop ──────────────────────────────────────────────────────────
+  const onDragStart = (e: DragEvent, id: string) => {
+    dragId.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', id); } catch { /* some browsers */ }
+  };
+  const allowDrop = (e: DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (overId !== id) setOverId(id);
+  };
+  const endDrag = () => { dragId.current = null; setOverId(null); };
+  const dropBeforeFeature = (e: DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const drag = dragId.current;
+    endDrag();
+    if (!drag || drag === targetId) return;
+    s.moveTreeItem(drag, containerOf(targetId), targetId); // insert before target, in its container
+  };
+  const dropOnCategory = (e: DragEvent, catId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const drag = dragId.current;
+    endDrag();
+    if (!drag || drag === catId) return;
+    if (catById.has(drag)) s.moveTreeItem(drag, null, catId); // reorder a category before this one
+    else s.moveTreeItem(drag, catId, null); // drop a feature into this category
+  };
+  const dropAtRootEnd = (e: DragEvent) => {
+    e.preventDefault();
+    const drag = dragId.current;
+    endDrag();
+    if (drag) s.moveTreeItem(drag, null, null);
+  };
+  const dropAtCategoryEnd = (e: DragEvent, catId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const drag = dragId.current;
+    endDrag();
+    if (!drag || catById.has(drag)) return; // features only; categories live at root
+    s.moveTreeItem(drag, catId, null); // append to the end of this category
+  };
+
+  const renderFeature = (f: Feature, indented: boolean) => {
+    const sketchName = f.type === 'extrude' ? s.doc.features.find((x) => x.id === f.sketchId)?.name ?? '?' : null;
+    return (
+      <div
+        key={f.id}
+        className={`feature-row ${s.selectedFeatureId === f.id ? 'selected' : ''}`}
+        draggable
+        onDragStart={(e) => onDragStart(e, f.id)}
+        onDragEnd={endDrag}
+        onDragOver={(e) => allowDrop(e, f.id)}
+        onDrop={(e) => dropBeforeFeature(e, f.id)}
+        onClick={() => s.select(f.id)}
+        onDoubleClick={() => { if (f.type === 'sketch') s.enterSketch(f.id); }}
+        title={f.type === 'sketch' ? 'Double-click to edit sketch' : f.name}
+        style={{
+          marginLeft: indented ? 16 : 0,
+          borderTop: overId === f.id ? '2px solid var(--accent)' : '2px solid transparent',
+        }}
+      >
+        <span className="ftype">{TYPE_LABEL[f.type]}</span>
+        <span className="fname" style={{ opacity: f.visible ? 1 : 0.45 }}>{f.name}</span>
+        {f.type === 'extrude' && (
+          <span className="flock" title={`Locked to sketch "${sketchName}" — open properties to detach`}>🔒</span>
+        )}
+        {errorFor(f.id) && <span className="fwarn" title={errorFor(f.id)}>⚠</span>}
+        <button
+          className={`mini mini-eye${f.visible ? '' : ' mini-eye-closed'}`}
+          title={f.visible ? 'Hide' : 'Show'}
+          onClick={(e) => { e.stopPropagation(); s.updateFeature(f.id, (x) => ({ ...x, visible: !x.visible })); }}
+        >
+          {f.visible ? <EyeOpenIcon /> : <EyeClosedIcon />}
+        </button>
+        <button
+          className="mini mini-close"
+          title="Delete"
+          onClick={(e) => { e.stopPropagation(); confirmDeleteFeature(f.id); }}
+        >
+          <CrossIcon />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <>
-      <div style={{ display: 'flex', gap: 4, padding: '2px 2px 6px', flexWrap: 'wrap' }}>
+      <div style={{ padding: '2px 2px 6px' }}>
         <button
-          style={bulkBtn}
-          title={anyVis ? 'Hide every feature' : 'Show every feature'}
-          onClick={() => setVis(() => true, !anyVis)}
+          style={{ width: '100%', fontSize: 11, padding: '3px 4px' }}
+          title="Add a category to group features. Drag features onto it; drag to reorder."
+          onClick={() => {
+            const name = window.prompt('New category name:', `Group ${(s.doc.categories?.length ?? 0) + 1}`);
+            if (name && name.trim()) s.addCategory(name.trim());
+          }}
         >
+          + Add category
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 4, padding: '0 2px 4px', flexWrap: 'wrap' }}>
+        <button style={bulkBtn} title={anyVis ? 'Hide every feature' : 'Show every feature'} onClick={() => setVis(() => true, !anyVis)}>
           {anyVis ? 'Hide all' : 'Show all'}
         </button>
-        <button
-          style={bulkBtn}
-          disabled={!sketches.length}
-          title={anySketchVis ? 'Hide all sketches' : 'Show all sketches'}
-          onClick={() => setVis((f) => f.type === 'sketch', !anySketchVis)}
-        >
+        <button style={bulkBtn} disabled={!sketches.length} title={anySketchVis ? 'Hide all sketches' : 'Show all sketches'} onClick={() => setVis((f) => f.type === 'sketch', !anySketchVis)}>
           {anySketchVis ? 'Hide sketches' : 'Show sketches'}
         </button>
-        <button
-          style={bulkBtn}
-          disabled={!objects.length}
-          title={anyObjVis ? 'Hide all bodies (extrudes, primitives, imports)' : 'Show all bodies'}
-          onClick={() => setVis((f) => f.type !== 'sketch', !anyObjVis)}
-        >
+        <button style={bulkBtn} disabled={!objects.length} title={anyObjVis ? 'Hide all bodies (extrudes, primitives, imports)' : 'Show all bodies'} onClick={() => setVis((f) => f.type !== 'sketch', !anyObjVis)}>
           {anyObjVis ? 'Hide objects' : 'Show objects'}
         </button>
       </div>
-      {s.doc.features.map((f) => {
-        const sketchName =
-          f.type === 'extrude'
-            ? s.doc.features.find((x) => x.id === f.sketchId)?.name ?? '?'
-            : null;
-        return (
-        <div
-          key={f.id}
-          className={`feature-row ${s.selectedFeatureId === f.id ? 'selected' : ''}`}
-          onClick={() => s.select(f.id)}
-          onDoubleClick={() => {
-            if (f.type === 'sketch') s.enterSketch(f.id);
-          }}
-          title={f.type === 'sketch' ? 'Double-click to edit sketch' : f.name}
-        >
-          <span className="ftype">{TYPE_LABEL[f.type]}</span>
-          <span className="fname" style={{ opacity: f.visible ? 1 : 0.45 }}>
-            {f.name}
-          </span>
-          {f.type === 'extrude' && (
-            <span
-              className="flock"
-              title={`Locked to sketch "${sketchName}" — open properties to detach`}
-            >
-              🔒
-            </span>
-          )}
-          {errorFor(f.id) && (
-            <span className="fwarn" title={errorFor(f.id)}>
-              ⚠
-            </span>
-          )}
-          <button
-            className={`mini mini-eye${f.visible ? '' : ' mini-eye-closed'}`}
-            title={f.visible ? 'Hide' : 'Show'}
-            onClick={(e) => {
-              e.stopPropagation();
-              s.updateFeature(f.id, (x) => ({ ...x, visible: !x.visible }));
-            }}
-          >
-            {f.visible ? <EyeOpenIcon /> : <EyeClosedIcon />}
-          </button>
-          <button
-            className="mini mini-close"
-            title="Delete"
-            onClick={(e) => {
-              e.stopPropagation();
-              confirmDeleteFeature(f.id);
-            }}
-          >
-            <CrossIcon />
-          </button>
-        </div>
-        );
+
+      {tree.rootOrder.map((id) => {
+        const cat = catById.get(id);
+        if (cat) {
+          return (
+            <div key={cat.id}>
+              <div
+                className="feature-row"
+                draggable
+                onDragStart={(e) => onDragStart(e, cat.id)}
+                onDragEnd={endDrag}
+                onDragOver={(e) => allowDrop(e, cat.id)}
+                onDrop={(e) => dropOnCategory(e, cat.id)}
+                style={{
+                  fontWeight: 600,
+                  background: overId === cat.id ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : undefined,
+                  borderTop: '2px solid transparent',
+                }}
+                title="Drag features here to group them · drag to reorder · double-click name to rename"
+              >
+                <button
+                  className="mini"
+                  title={cat.collapsed ? 'Expand' : 'Collapse'}
+                  onClick={(e) => { e.stopPropagation(); s.updateCategory(cat.id, (c) => ({ ...c, collapsed: !c.collapsed })); }}
+                >
+                  {cat.collapsed ? '▶' : '▼'}
+                </button>
+                <span
+                  className="fname"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    const name = window.prompt('Rename category:', cat.name);
+                    if (name && name.trim()) s.updateCategory(cat.id, (c) => ({ ...c, name: name.trim() }));
+                  }}
+                >
+                  {cat.name} <span style={{ opacity: 0.55, fontWeight: 400 }}>({cat.children.length})</span>
+                </span>
+                {(() => {
+                  const childSet = new Set(cat.children);
+                  const anyChildVis = cat.children.some((fid) => featureById.get(fid)?.visible);
+                  return (
+                    <button
+                      className={`mini mini-eye${anyChildVis ? '' : ' mini-eye-closed'}`}
+                      title={anyChildVis ? 'Hide all items in this category' : 'Show all items in this category'}
+                      disabled={!cat.children.length}
+                      onClick={(e) => { e.stopPropagation(); setVis((f) => childSet.has(f.id), !anyChildVis); }}
+                    >
+                      {anyChildVis ? <EyeOpenIcon /> : <EyeClosedIcon />}
+                    </button>
+                  );
+                })()}
+                <button
+                  className="mini mini-close"
+                  title="Delete category (keeps its features, moves them out)"
+                  onClick={(e) => { e.stopPropagation(); s.removeCategory(cat.id); }}
+                >
+                  <CrossIcon />
+                </button>
+              </div>
+              {!cat.collapsed && (
+                <>
+                  {cat.children.map((fid) => {
+                    const f = featureById.get(fid);
+                    return f ? renderFeature(f, true) : null;
+                  })}
+                  {/* end-of-category drop zone: append into this category */}
+                  <div
+                    onDragOver={(e) => allowDrop(e, `end:${cat.id}`)}
+                    onDrop={(e) => dropAtCategoryEnd(e, cat.id)}
+                    title={`Drop here to add to the end of "${cat.name}"`}
+                    style={{
+                      marginLeft: 16,
+                      height: overId === `end:${cat.id}` ? 16 : 9,
+                      borderTop: overId === `end:${cat.id}` ? '2px solid var(--accent)' : '2px dashed var(--border)',
+                      borderRadius: 2,
+                      opacity: overId === `end:${cat.id}` ? 1 : 0.5,
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          );
+        }
+        const f = featureById.get(id);
+        return f ? renderFeature(f, false) : null;
       })}
+
+      {/* root drop zone (append to root end) */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+        onDrop={dropAtRootEnd}
+        style={{ minHeight: 16 }}
+      />
     </>
   );
 }
