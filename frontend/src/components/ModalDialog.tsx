@@ -20,6 +20,9 @@ import {
 } from '../vfs/vfsClient';
 import { ProjectDetailsModal } from './panels/ProjectDetailsModal';
 import { AddRootModal } from './panels/AddRootModal';
+import { VfsOpenBrowserModal } from './panels/VfsOpenBrowserModal';
+import { VfsSaveAsModal } from './panels/VfsSaveAsModal';
+import { refreshVfsStatus } from '../vfs/vfsStatus';
 
 // ── Button bar ─────────────────────────────────────────────────────────────
 
@@ -738,6 +741,8 @@ function AppSettingsModal({ onClose }: { modal: ModalState; onClose: () => void 
   useEffect(() => {
     actionRegistry.register('appSettingsModal:save', () => {
       saveVfsConfig(formRef.current);
+      // Connection changed → re-probe VFS readiness (gates Open / Save / Save As).
+      void refreshVfsStatus();
       onClose();
     });
     return () => actionRegistry.unregister('appSettingsModal:save');
@@ -822,6 +827,8 @@ const MODAL_REGISTRY: Record<string, ModalComponent> = {
   AppSettingsModal,
   ProjectDetailsModal,
   AddRootModal,
+  VfsOpenBrowserModal,
+  VfsSaveAsModal,
 };
 
 // ── Individual modal dialog ────────────────────────────────────────────────

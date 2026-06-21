@@ -148,6 +148,9 @@ export async function loadProject(file: File): Promise<{ doc: Doc; meta: Project
     createdAt: typeof rawMeta.createdAt === 'string' ? rawMeta.createdAt : null,
     modifiedAt: typeof rawMeta.modifiedAt === 'string' ? rawMeta.modifiedAt : null,
     defaultRootId: typeof rawMeta.defaultRootId === 'string' ? rawMeta.defaultRootId : null,
+    defaultRootConfig: typeof rawMeta.defaultRootConfig === 'string' ? rawMeta.defaultRootConfig : null,
+    defaultFilePath: typeof rawMeta.defaultFilePath === 'string' ? rawMeta.defaultFilePath : null,
+    defaultRootName: typeof rawMeta.defaultRootName === 'string' ? rawMeta.defaultRootName : null,
   };
 
   return { doc: loadedDoc, meta };

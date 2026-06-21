@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState, MenuItem, MenuRootItem } from './types';
 import { AppStateProvider, useAppState } from './contexts/AppStateContext';
 import { useStore } from './studio/state/store';
-import { isVfsConfigured } from './vfs/vfsAdmin';
+import { refreshVfsStatus, useVfsAppReady } from './vfs/vfsStatus';
 import { actionRegistry } from './utils/actionRegistry';
 import {
   saveLayoutToFile,
@@ -581,12 +581,16 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
   const mode = useStore((s) => s.mode);
   const selectedFeatureId = useStore((s) => s.selectedFeatureId);
   const features = useStore((s) => s.doc.features);
-  const defaultRootId = useStore((s) => s.projectMeta.defaultRootId);
+  const projectHasDefault = useStore((s) => Boolean(s.projectMeta.defaultRootId));
+  const vfsAppReady = useVfsAppReady();
   return useMemo<MenuRootItem[]>(() => {
     const inSketch = mode === 'sketch';
     const inAssembly = mode === 'assembly';
-    // File ▸ Save (to VFS) needs both a configured server and a default root.
-    const canVfsSave = isVfsConfigured() && Boolean(defaultRootId);
+    // Open browses the application 'config' roots → needs the app to be ready.
+    const canOpen = vfsAppReady;
+    // Save / Save As need either the application default root, or a default root
+    // already chosen on this project (its own VFS topic / settings).
+    const canSave = vfsAppReady || projectHasDefault;
     // Advanced ▸ extrude-profile items enable only for a selected extrude.
     const sel = features.find((f) => f.id === selectedFeatureId);
     const isExtrude = sel?.type === 'extrude';
@@ -614,12 +618,15 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
         };
       }
       if (root.id === 'menu-file') {
-        // Disable "Save Project" (VFS save) until a server + default root exist.
+        // Gate Open (needs the application VFS) and Save / Save As (app VFS or a
+        // project-level default root).
         return {
           ...root,
-          children: root.children.map((c): MenuItem =>
-            c.id === 'file-save' ? { ...c, disabled: !canVfsSave } : c,
-          ),
+          children: root.children.map((c): MenuItem => {
+            if (c.id === 'file-open') return { ...c, disabled: !canOpen };
+            if (c.id === 'file-save' || c.id === 'file-save-as') return { ...c, disabled: !canSave };
+            return c;
+          }),
         };
       }
       if (root.id === 'menu-sketch') {
@@ -652,7 +659,7 @@ function useSketchAwareMenu(baseMenu: MenuRootItem[]): MenuRootItem[] {
       }
       return root;
     });
-  }, [baseMenu, mode, selectedFeatureId, features, defaultRootId]);
+  }, [baseMenu, mode, selectedFeatureId, features, projectHasDefault, vfsAppReady]);
 }
 
 // ── Inner app (rendered inside AppStateProvider) ─────────────────────────
@@ -661,6 +668,8 @@ function AppInner({ menuDef }: { menuDef: MenuRootItem[] }) {
   useGlobalActions();
   usePopoutWatcher();
   useStudioActions();
+  // Probe VFS readiness once on load (gates Open / Save / Save As).
+  useEffect(() => { void refreshVfsStatus(); }, []);
   const liveMenu = useSketchAwareMenu(menuDef);
 
   return (

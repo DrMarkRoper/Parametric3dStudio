@@ -60,6 +60,14 @@ export interface ProjectMeta {
   modifiedAt: string | null; // ISO timestamp; null until first save
   /** VFS root id this project saves to by default. null until a root exists. */
   defaultRootId: string | null;
+  /** VFS config key the default root belongs to ('config' = application-level,
+   *  or the project's id for a project root). null until a default is chosen. */
+  defaultRootConfig: string | null;
+  /** Forward-slashed path (incl. filename) the project was last saved to on the
+   *  VFS, relative to its root. null until saved via Save As. */
+  defaultFilePath: string | null;
+  /** Display name (virtual_name) of the default/opened root, for the UI. */
+  defaultRootName: string | null;
 }
 
 export const emptyProjectMeta = (): ProjectMeta => ({
@@ -69,6 +77,9 @@ export const emptyProjectMeta = (): ProjectMeta => ({
   createdAt: null,
   modifiedAt: null,
   defaultRootId: null,
+  defaultRootConfig: null,
+  defaultFilePath: null,
+  defaultRootName: null,
 });
 
 export interface DynamicOp {

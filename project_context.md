@@ -21,9 +21,13 @@ toolbar. Prototype stage.
 
 ### Project shell
 
-- **Project metadata**: every project carries `{ name, description, createdAt,
-  modifiedAt }`, displayed after the em-dash in the title bar (or `— unsaved`
-  before the first save). A trailing `*` marks the doc as dirty.
+- **Project metadata**: every project carries `{ projectId, name, description,
+  createdAt, modifiedAt, defaultRootId, defaultRootConfig, defaultRootName,
+  defaultFilePath }` (see §11 for the VFS-location fields). `name` is displayed
+  after the em-dash in the title bar (or `— unsaved` before the first save). A
+  trailing `*` marks the doc as dirty. `projectId` is a stable UUID minted for
+  every new project (and for legacy files on load), also used as the project's
+  VFS config key.
 - **Save / Save As**: first save (or any time the name is blank) opens
   `SaveProjectModal` (name required, description optional, created date shown
   when known). Subsequent saves just refresh `modifiedAt`. **Save Project As…**
@@ -273,7 +277,14 @@ Parametric3dStudio/
         StudioStatusBar.tsx   ← APP-LAYER replacement for framework StatusBar
                                  (hint + errors + cursor + grid / snap controls)
         panels/               ← APP PANELS: FeaturesPanel, CanvasPanel, InfoPanel,
-                                 JointsPanel, LinksPanel (Assembly-mode tabs)
+                                 JointsPanel, LinksPanel (Assembly-mode tabs);
+                                 ProjectDetailsModal, AddRootModal,
+                                 VfsOpenBrowserModal, VfsSaveAsModal (VFS — §11)
+      vfs/                    ← VFS server integration (see §11):
+        vfsClient.ts            connection config (localStorage) + checkConnection
+        vfsAdmin.ts             admin surface (/api/admin/*): roots/configs + writeProjectFile
+        vfsApi.ts               public surface (/api/vfs/*): listRoots/browse/fetchFileText
+        vfsStatus.ts            app-readiness store (useVfsAppReady / refreshVfsStatus)
       studio/                 ← VENDORED modelling engine; small additive edits
                                  logged in framework_changes.md when needed
         types.ts  occt-import-js.d.ts  studio.css
@@ -467,11 +478,15 @@ Visibility rules in the bridge:
 
 The menu bar (`public/data/menus/main_menu.json`) mirrors the actions:
 
-- **File**: New (Ctrl+Shift+N), Open (Ctrl+Shift+O), Save (Ctrl+Shift+S),
-  **Save Project As…** (Ctrl+Shift+A) · **Application Settings…**
-  (`studio:appSettings` — stub for now) · **Project Details…**
-  (`studio:projectDetails` — opens the Save-As modal to edit `projectMeta`
-  name/description in place, no file write; name blank when unsaved) · Export as STL…
+- **File**: **Application Settings…** (`studio:appSettings` — VFS connection
+  dialog, §11) · New (Ctrl+Shift+N), Open (Ctrl+Shift+O — **VFS open browser**),
+  Save (Ctrl+Shift+S — **VFS write-back / falls through to Save As for a new
+  project**), **Save Project As…** (Ctrl+Shift+A — **two-step VFS save**),
+  **Download** (`studio:download` — original local-file save) · **Import…**
+  (`studio:importProject` — original local-file open) · **Project Details…**
+  (`studio:projectDetails` — tabbed General + VFS Roots modal, §11) ·
+  Export as STL… · Open / Save / Save As are disabled until the VFS is ready
+  (server + default root) — see §11.
 - **Edit**: Undo, Redo
 - **Create**: Cube, Sphere, Cylinder, Cone, Torus, **Custom ▸** (Bulb screw,
   Bulb socket, Screw thread, Nut thread) · Import STL · Extrude · Move, Rotate,
@@ -678,9 +693,13 @@ includes `'arc'`, `'measure'`, `'dimension'`, `'offset'`), `pendingImage`,
 `measureState` (`{ p1, p2 }`), `dimensionDraft` (`{ p1, p2 }`), plus
 `past[]` / `future[]` (50-step undo).
 
-Project-shell state: `projectMeta` (`{ name, description, createdAt,
-modifiedAt }`), `dirty: boolean` — flipped on every undoable `setDoc` and on
-undo / redo; cleared by `markClean()` (called after save / load / new).
+Project-shell state: `projectMeta` (`{ projectId, name, description, createdAt,
+modifiedAt, defaultRootId, defaultRootConfig, defaultRootName, defaultFilePath }`
+— the last four are the VFS location, §11), `dirty: boolean` — flipped on every
+undoable `setDoc` and on undo / redo; cleared by `markClean()` (called after save
+/ load / new). Helper `newProjectId()` mints the UUID. The reconstruction sites
+in `studioBridge` build new metas with `{ ...meta, … }` spreads so all fields
+carry through automatically.
 
 Actions used by the bridge: `setDoc`, `newProject` (also resets meta + dirty +
 tool + selection), `addFeature`, `enterSketch` (chooses `'line'` for empty
@@ -790,3 +809,124 @@ adapt via `usePalette()`.
 - MDI side: per-panel doc toolbars, a real Output / console panel for the
   bottom row, floating / pop-out support for the Canvas, restore Window menu
   when closable / restorable documents are introduced.
+
+---
+
+## 11. VFS integration (server save / open)
+
+Projects can be saved to and opened from a **Virtual File System (VFS) server** —
+a shared multi-application Flask service that mounts real host folders as named
+*virtual roots* and exposes them over HTTP. Real OS paths never reach the client;
+everything is keyed by `{ application_id, config_key, root_id, file_path }`.
+Built against the `vfs-integration` skill (its `SKILL.md` is the authoritative
+API contract). All client code lives under `src/vfs/`; the UI is a set of modals
+under `components/panels/`.
+
+### 11.1 Concepts / mapping
+
+- **application_id** — this client's identity on the server (a server-minted
+  uuid4). Entered in Application Settings, stored in localStorage.
+- **config key ("topic"/"project")** — request scope `?config=<key>`. Two are
+  used: `config` = the **application-level** shared config, and a project's
+  `projectId` = its **own** config. The default key is `config`.
+- **root** — a mounted folder within a config. Has `allow_subfolders`,
+  `allowed_file_types`, and effective `can_read` / `can_write` flags.
+- **Two API surfaces**: public `/api/vfs/*` (browse / read / **write**) and
+  admin `/api/admin/*` (configs / roots CRUD, application metadata, validate
+  path). File read/write are gated by `allow_read_files` / `allow_write_files`
+  AND-ed across application → project → root.
+
+### 11.2 Client modules (`src/vfs/`)
+
+- **`vfsClient.ts`** — connection config (`serverUrl` + `applicationId`,
+  persisted to localStorage as `parametric3dstudio.vfs.connection`),
+  `loadVfsConfig` / `saveVfsConfig`, `checkConnection()` (probes
+  `GET /api/vfs/roots`, distinguishes unreachable / bad app-id / connected), and
+  `fetchApplicationName()` (admin `GET /api/admin/applications/<id>` → name, for
+  the "Connected as …" message).
+- **`vfsAdmin.ts`** — admin surface + `VfsApiError` (carries `{ code }`).
+  `listProjectRoots(config)`, `createProjectConfig`, `createProjectRoot`,
+  `addRootEnsuringConfig` (creates the project's config keyed by `projectId` +
+  named after the project if missing, then adds the root), `validatePath`, and
+  **`writeProjectFile(config, rootId, filePath, content, { overwrite })`** →
+  `POST /api/vfs/write/<root>/<path>?config=&overwrite=` with the raw bytes.
+  `isVfsConfigured()` = server + app id present.
+- **`vfsApi.ts`** — public surface: `listRoots(config)` (with `can_read` /
+  `can_write`), `browse(rootId, subPath, config)`, `fetchFileText` (loads a
+  saved project), `streamUrl`.
+- **`vfsStatus.ts`** — an external store (`useVfsAppReady()` /
+  `refreshVfsStatus()`); "app ready" = server reachable AND the `config` topic
+  has ≥1 root. Probed on app load (in `AppInner`) and after Application Settings
+  is saved. Gates the File menu (§11.5).
+
+### 11.3 UI modals (`components/panels/`, registered in `ModalDialog.tsx`)
+
+- **AppSettingsModal** (File ▸ Application Settings…) — server URL + application
+  id + a "Test connection" button reporting pass/fail inline; Save persists and
+  re-probes readiness.
+- **ProjectDetailsModal** (File ▸ Project Details…) — tabbed:
+  - *General* — read-only `projectId`, name, description, **File location**
+    line (`Application|Project: <root>/<path>`, shown when known), created /
+    modified dates. Save commits name/description to `projectMeta` (marks dirty).
+  - *VFS Roots* — disabled until a server URL + project name exist. Lists this
+    project's roots; **+ Add folder** opens AddRootModal; a **Default Folder**
+    dropdown combines application `config` roots (prefixed `Application:`) then
+    the project's own roots, value = `${config}::${rootId}`. First option is
+    auto-selected; the choice is stored as `defaultRootId` + `defaultRootConfig`
+    + `defaultRootName`.
+- **AddRootModal** — mirrors the skill RootEditor (virtual name, live-validated
+  real path, enabled / subfolders, allowed types, description); on Create,
+  ensures the project's config exists then adds the root.
+- **VfsOpenBrowserModal** (File ▸ Open) — browses the `config` roots (root
+  selector labelled `Application: …`, breadcrumb, Up), shows only `.json`,
+  Open loads the picked file and records its location.
+- **VfsSaveAsModal** (File ▸ Save As, step 2) — a filename box above a writable-
+  root browser; Save writes to root ▸ folder ▸ `<name>.json` with an Overwrite
+  checkbox. `FILE_EXISTS` / `WRITE_DENIED` surfaced inline.
+
+Stacked modals communicate via callbacks passed in `modal.props` (e.g.
+`onPick` / `onSave` / `onCreated`); Save/Open/Create buttons use
+`closesModal: 'on-success'` so a rejected write keeps the dialog open.
+
+### 11.4 Commands (`studioBridge.tsx`) & metadata
+
+The VFS-location fields on `projectMeta` (§8.3): `defaultRootId`,
+`defaultRootConfig` (`config` or a `projectId`), `defaultRootName` (display),
+`defaultFilePath` (forward-slashed path incl. filename). Serialized into the
+`version: 2` file `meta`; legacy files get a fresh `projectId` and null location
+on load.
+
+- **`saveProjectCmd`** (File ▸ Save) — if the project has a location
+  (`defaultFilePath` + root + config) → `writeProjectFile(..., { overwrite: true })`
+  back over that file; otherwise (a new project) it **falls through to Save As**.
+- **`saveProjectAsCmd`** (File ▸ Save As) — step 1 collects name/description with
+  a **Next** button (`_openSaveModal` accepts a `primaryLabel`); step 2 opens
+  VfsSaveAsModal pre-filled from the current location if any (root, folder,
+  filename). On Save it mints a **new `projectId`**, writes the file, and adopts
+  that location.
+- **`downloadProjectCmd`** (File ▸ Download) — the original local-download save.
+- **`openProjectCmd`** (File ▸ Open) — confirms-if-dirty, opens VfsOpenBrowserModal
+  on the `config` topic; on pick, `fetchFileText` → `applyProjectFile` (shared
+  loader) → records `defaultRoot*` + `defaultFilePath` so a later Save round-trips.
+- **`importProjectCmd`** (File ▸ Import…) — the original local file-picker open.
+- **`newProjectCmd`** — after resetting, `seedApplicationDefaultRoot()` best-effort
+  sets the new project's default root to the first `config` root if the server is
+  reachable.
+
+### 11.5 Menu gating (`App.tsx` `useSketchAwareMenu`)
+
+`menu-file` items are toggled from `useVfsAppReady()` + `projectMeta.defaultRootId`:
+**Open** enabled when the app is ready (server + a `config` root); **Save** /
+**Save As** enabled when the app is ready **or** the project already has a default
+root. (Download / Import are always enabled — local files.)
+
+### 11.6 Notes / limitations
+
+- Cross-origin requires the VFS server to allow the dev origin via CORS
+  (`--cors-origin` / `VFS_CORS_ORIGINS`) — both `/api/vfs/*` and `/api/admin/*`.
+- Admin-surface calls (roots/configs, app name) need the app's
+  `can_create_*` / read flags; `PERMISSION_DENIED` / `WRITE_DENIED` are surfaced,
+  not retried.
+- Open browses only the `config` topic, so it finds files in the application's
+  shared roots (not arbitrary per-project configs).
+- Readiness is async: File items start disabled on load until the probe resolves.

@@ -13,7 +13,7 @@
 import { useRef } from 'react';
 import * as THREE from 'three';
 import { regenerate } from './core/buildGeometry';
-import { importCache, nextName, useStore, type PendingImage, type ProjectMeta } from './state/store';
+import { importCache, nextName, newProjectId, useStore, type PendingImage, type ProjectMeta } from './state/store';
 import { linkKind, teethRatio } from './core/assembly';
 import * as dialogService from '../utils/dialogService';
 import { actionRegistry } from '../utils/actionRegistry';
@@ -37,7 +37,8 @@ import {
   type Vec3,
 } from './types';
 import { exportSTL, loadProject, saveProject, serializeProject } from './io/exporters';
-import { isVfsConfigured, writeProjectFile, VfsApiError } from '../vfs/vfsAdmin';
+import { isVfsConfigured, listProjectRoots, writeProjectFile, VfsApiError } from '../vfs/vfsAdmin';
+import { fetchFileText } from '../vfs/vfsApi';
 import { IMPORT_EXTENSIONS, importModelFile } from './io/importers';
 
 type RegenResult = ReturnType<typeof regenerate>;
@@ -96,9 +97,11 @@ function openSaveProjectDialog(
   isSaveAs: boolean,
   prefill: ProjectMeta,
   onSave: (next: { name: string; description: string }) => void,
+  primaryLabel = 'Save',
 ) {
   actionRegistry.invoke('studio:_openSaveModal', {
     title: isSaveAs ? 'Save Project As' : 'Save Project',
+    primaryLabel,
     props: {
       name: prefill.name ?? '',
       description: prefill.description ?? '',
@@ -120,12 +123,11 @@ export function downloadProjectCmd() {
   const doSave = (next: { name: string; description: string }) => {
     const now = new Date().toISOString();
     const updated: ProjectMeta = {
-      projectId: meta.projectId,
+      ...meta,
       name: next.name.trim(),
       description: next.description,
       createdAt: meta.createdAt ?? now,
       modifiedAt: now,
-      defaultRootId: meta.defaultRootId,
     };
     saveProject(useStore.getState().doc, projectFileName(updated.name), updated);
     useStore.getState().setProjectMeta(updated);
@@ -140,28 +142,23 @@ export function downloadProjectCmd() {
 }
 
 /**
- * Save the current project to its VFS default root on the server. Requires a
- * configured VFS connection, a project name, and a default root (the File ▸ Save
- * menu item is disabled otherwise). Writes the `.cad.json` payload to the root's
- * top level under the project's file name.
+ * Save the current project. If it already has a known VFS location (opened or
+ * previously Saved-As), write back over that file. Otherwise — a new project
+ * with no location yet — fall through to the Save As flow.
  */
 export function saveProjectCmd() {
   const meta = useStore.getState().projectMeta;
 
-  if (!isVfsConfigured() || !meta.defaultRootId) {
-    dialogService.showAlert({
-      title: 'Save Project',
-      message: 'Configure a VFS server (File ▸ Application Settings) and a default folder (File ▸ Project Details ▸ VFS Roots) before saving.',
-      mode: 'warning',
-    });
+  // New project (no known VFS file location yet) → run the Save As flow.
+  if (!meta.defaultFilePath || !meta.defaultRootId || !meta.defaultRootConfig) {
+    saveProjectAsCmd();
     return;
   }
 
-  const name = (meta.name ?? '').trim();
-  if (!name) {
+  if (!isVfsConfigured()) {
     dialogService.showAlert({
       title: 'Save Project',
-      message: 'Give the project a name in Project Details before saving.',
+      message: 'Configure a VFS server (File ▸ Application Settings) before saving.',
       mode: 'warning',
     });
     return;
@@ -170,14 +167,13 @@ export function saveProjectCmd() {
   const now = new Date().toISOString();
   const updated: ProjectMeta = {
     ...meta,
-    name,
     createdAt: meta.createdAt ?? now,
     modifiedAt: now,
   };
-  const fileName = projectFileName(name);
   const content = serializeProject(useStore.getState().doc, updated);
 
-  writeProjectFile(updated.projectId, meta.defaultRootId, fileName, content)
+  // Write back over the existing file at its known root + path.
+  writeProjectFile(meta.defaultRootConfig, meta.defaultRootId, meta.defaultFilePath, content, { overwrite: true })
     .then(() => {
       useStore.getState().setProjectMeta(updated);
       useStore.getState().markClean();
@@ -191,24 +187,65 @@ export function saveProjectCmd() {
     });
 }
 
-/** Always prompt with the stored details pre-filled, then save under a (possibly new) name. */
+/**
+ * Save As — two steps:
+ *   1. Collect name + description ('Next' button).
+ *   2. A VFS save browser (filename box + root/folder picker, 'Save' button).
+ * On Save: mint a NEW project id and write the JSON to the chosen
+ * root ▸ folder ▸ filename.json, then adopt that as the current project.
+ */
 export function saveProjectAsCmd() {
-  const s = useStore.getState();
-  const meta = s.projectMeta;
+  if (!isVfsConfigured()) {
+    dialogService.showAlert({
+      title: 'Save Project As',
+      message: 'Configure a VFS server (File ▸ Application Settings) before saving to the server.',
+      mode: 'warning',
+    });
+    return;
+  }
+  const meta = useStore.getState().projectMeta;
+  // If the project already has a VFS location, pre-fill the browser with its
+  // current folder + filename; otherwise default the filename to the name.
+  const fp = meta.defaultFilePath;
+  const slash = fp ? fp.lastIndexOf('/') : -1;
+  const curFolder = fp && slash >= 0 ? fp.slice(0, slash) : '';
+  const curFileName = fp ? (slash >= 0 ? fp.slice(slash + 1) : fp).replace(/\.json$/i, '') : '';
+  // Step 1 — name + description, with a 'Next' button.
   openSaveProjectDialog(true, meta, (next) => {
-    const now = new Date().toISOString();
-    const updated: ProjectMeta = {
-      projectId: meta.projectId,
-      name: next.name.trim(),
-      description: next.description,
-      createdAt: meta.createdAt ?? now,
-      modifiedAt: now,
-      defaultRootId: meta.defaultRootId,
-    };
-    saveProject(useStore.getState().doc, projectFileName(updated.name), updated);
-    useStore.getState().setProjectMeta(updated);
-    useStore.getState().markClean();
-  });
+    // Step 2 — VFS save browser, prefilled from the current location if any.
+    actionRegistry.invoke('studio:_openVfsSaveAs', {
+      props: {
+        defaultFileName: curFileName || next.name.trim(),
+        defaultFolder: curFolder,
+        // Browse the default root's config (typically the application 'config').
+        configKey: meta.defaultRootConfig ?? 'config',
+        defaultRootId: meta.defaultRootId,
+        onSave: async (sel: {
+          rootId: string; rootName: string; configKey: string; folderPath: string; fileName: string; overwrite: boolean;
+        }) => {
+          const now = new Date().toISOString();
+          const cleanName = sel.fileName.replace(/\.json$/i, '').trim() || 'project';
+          const fileName = `${cleanName}.json`;
+          const filePath = sel.folderPath ? `${sel.folderPath}/${fileName}` : fileName;
+          const updated: ProjectMeta = {
+            projectId: newProjectId(),          // Save As creates a new project identity
+            name: next.name.trim() || cleanName,
+            description: next.description,
+            createdAt: now,
+            modifiedAt: now,
+            defaultRootId: sel.rootId,
+            defaultRootConfig: sel.configKey,
+            defaultFilePath: filePath,
+            defaultRootName: sel.rootName,
+          };
+          const content = serializeProject(useStore.getState().doc, updated);
+          await writeProjectFile(sel.configKey, sel.rootId, filePath, content, { overwrite: sel.overwrite });
+          useStore.getState().setProjectMeta(updated);
+          useStore.getState().markClean();
+        },
+      },
+    });
+  }, 'Next');
 }
 
 /**
@@ -246,12 +283,11 @@ function confirmDiscardIfDirty(intent: 'new project' | 'open project', proceed: 
         const doSaveAndProceed = (next: { name: string; description: string }) => {
           const now = new Date().toISOString();
           const updated: ProjectMeta = {
-            projectId: meta.projectId,
+            ...meta,
             name: next.name.trim(),
             description: next.description,
             createdAt: meta.createdAt ?? now,
             modifiedAt: now,
-            defaultRootId: meta.defaultRootId,
           };
           saveProject(useStore.getState().doc, projectFileName(updated.name), updated);
           useStore.getState().setProjectMeta(updated);
@@ -275,13 +311,107 @@ export function newProjectCmd() {
   confirmDiscardIfDirty('new project', () => {
     resetToModelMode();
     useStore.getState().newProject();
+    seedApplicationDefaultRoot();
   });
 }
 
-/** Internal — called by the file input's onChange handler in StudioFileInputs. */
-export function openProjectCmd() {
+/**
+ * Best-effort: if the VFS server is reachable and the application 'config' topic
+ * has at least one root, set the (just-created) project's default folder to the
+ * first such root. Silent on any failure — server down, no config, no roots →
+ * the project simply starts with no default until the user picks one.
+ */
+async function seedApplicationDefaultRoot() {
+  if (!isVfsConfigured()) return;
+  try {
+    const roots = await listProjectRoots('config');
+    if (!roots.length) return;
+    const cur = useStore.getState().projectMeta;
+    if (cur.defaultRootId) return; // user already chose one
+    useStore.getState().setProjectMeta({
+      ...cur,
+      defaultRootId: roots[0].id,
+      defaultRootConfig: 'config',
+    });
+  } catch {
+    /* server unavailable / no config — leave the default unset */
+  }
+}
+
+/**
+ * Load a project from a File (a local pick or bytes fetched from the VFS) and
+ * swap it into the store. Throws on parse/load errors so callers can surface
+ * them in their own UI.
+ */
+export async function applyProjectFile(file: File): Promise<void> {
+  const s = useStore.getState();
+  importCache.clear();
+  const { doc, meta } = await loadProject(file);
+  // Reset UI to default 3D model view before swapping the doc — guarantees we
+  // never resume in sketch mode against a doc whose sketch is gone.
+  resetToModelMode();
+  s.setDoc(doc, false);
+  s.setProjectMeta(meta);
+  s.markClean();
+  s.select(null);
+  const missing = doc.features.filter(
+    (f) => f.type === 'import' && !(f as ImportFeature).embedded && !importCache.has(f.id),
+  );
+  if (missing.length) {
+    dialogService.showAlert({
+      title: 'Open Project',
+      message: `${missing.length} imported mesh file${missing.length > 1 ? 's are' : ' is'} not stored in this project — please re-import.`,
+      mode: 'warning',
+    });
+  }
+}
+
+/**
+ * Import a project via the local system file dialog (the original "Open"
+ * behaviour, now exposed via File ▸ Import).
+ */
+export function importProjectCmd() {
   confirmDiscardIfDirty('open project', () => {
     fileTriggers.openProject?.();
+  });
+}
+
+/**
+ * Open a project from the VFS server: browse the current project's roots,
+ * pick a .json file, and load it. Requires a configured VFS connection.
+ */
+export function openProjectCmd() {
+  if (!isVfsConfigured()) {
+    dialogService.showAlert({
+      title: 'Open Project',
+      message: 'Configure a VFS server (File ▸ Application Settings) before opening from the server.',
+      mode: 'warning',
+    });
+    return;
+  }
+  confirmDiscardIfDirty('open project', () => {
+    // Browse the application's default config ('config') — its roots are
+    // available regardless of the current project's id (which may be unsaved).
+    actionRegistry.invoke('studio:_openVfsBrowser', {
+      props: {
+        configKey: 'config',
+        onPick: async (sel: { rootId: string; rootName: string; filePath: string; name: string; configKey: string }) => {
+          const text = await fetchFileText(sel.rootId, sel.filePath, sel.configKey);
+          const file = new File([text], sel.name, { type: 'application/json' });
+          await applyProjectFile(file);
+          // Remember where it was opened from so the location shows in Project
+          // Details and a later Save round-trips to the same file.
+          const cur = useStore.getState().projectMeta;
+          useStore.getState().setProjectMeta({
+            ...cur,
+            defaultRootId: sel.rootId,
+            defaultRootConfig: sel.configKey,
+            defaultRootName: sel.rootName,
+            defaultFilePath: sel.filePath,
+          });
+        },
+      },
+    });
   });
 }
 
@@ -651,27 +781,8 @@ export function StudioFileInputs() {
 
   const onOpenProject = async (files: FileList | null) => {
     if (!files?.[0]) return;
-    const s = useStore.getState();
     try {
-      importCache.clear();
-      const { doc, meta } = await loadProject(files[0]);
-      // Reset UI to default 3D model view before swapping the doc — guarantees
-      // we never resume in sketch mode against a doc whose sketch is gone.
-      resetToModelMode();
-      s.setDoc(doc, false);
-      s.setProjectMeta(meta);
-      s.markClean();
-      s.select(null);
-      const missing = doc.features.filter(
-        (f) => f.type === 'import' && !(f as ImportFeature).embedded && !importCache.has(f.id),
-      );
-      if (missing.length) {
-        dialogService.showAlert({
-          title: 'Open Project',
-          message: `${missing.length} imported mesh file${missing.length > 1 ? 's are' : ' is'} not stored in this project — please re-import.`,
-          mode: 'warning',
-        });
-      }
+      await applyProjectFile(files[0]);
     } catch (e) {
       dialogService.showAlert({
         title: 'Open Failed',

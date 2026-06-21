@@ -8,9 +8,11 @@
       { "id": "file-open",    "type": "action", "label": "Open Project…",     "icon": "📂", "shortcut": "Ctrl+Shift+O", "shortcutKey": { "ctrl": true, "shift": true, "key": "o" }, "action": "studio:open",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save",    "type": "action", "label": "Save Project",      "icon": "💾", "shortcut": "Ctrl+Shift+S", "shortcutKey": { "ctrl": true, "shift": true, "key": "s" }, "action": "studio:save",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save-as", "type": "action", "label": "Save Project As…",  "icon": "💾", "shortcut": "Ctrl+Shift+A", "shortcutKey": { "ctrl": true, "shift": true, "key": "a" }, "action": "studio:saveAs",   "visible": true, "disabled": false, "children": [] },
+      { "id": "file-sep-import", "type": "separator" },
       { "id": "file-download", "type": "action", "label": "Download",          "icon": "⬇", "action": "studio:download", "visible": true, "disabled": false, "children": [] },
+      { "id": "file-import", "type": "action", "label": "Import…",             "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.3' width='14' height='14'><path d='M8 2.5v6.5'/><path d='M5.5 6.5 8 9l2.5-2.5'/><path d='M2.5 10.5v1.8a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1.8'/></svg>", "action": "studio:importProject", "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-0", "type": "separator" },
-      { "id": "file-project-details", "type": "action", "label": "Project Details…",   "icon": "📝", "action": "studio:projectDetails", "visible": true, "disabled": false, "children": [] },
+      { "id": "file-project-details", "type": "action", "label": "Project Details…",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.3' width='14' height='14'><path d='M4 2h5l3 3v9H4z'/><path d='M9 2v3h3'/><path d='M6 8.5h4M6 11h4'/></svg>", "action": "studio:projectDetails", "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-1", "type": "separator" },
       { "id": "file-export",  "type": "action", "label": "Export as STL…",    "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:exportStl", "visible": true, "disabled": false, "children": [] }
     ]

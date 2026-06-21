@@ -36,8 +36,22 @@ document containers with draggable tabs, and a status bar.
 - Import STL / OBJ / glTF / GLB / STEP (STEP via lazy-loaded OpenCascade
   WASM).
 - Export STL.
-- Save / load JSON project files with project metadata (name, description,
-  created / modified timestamps) and embedded meshes for detached bodies.
+- Save / load JSON project files with project metadata (id, name, description,
+  created / modified timestamps, VFS location) and embedded meshes for detached
+  bodies. **Download** writes the JSON as a local browser download; **Import…**
+  loads one from a local file picker.
+
+**VFS server integration**
+
+- Connect to a Virtual File System (VFS) server (File ▸ Application Settings):
+  server URL + application id, with a live "Test connection" probe.
+- **Save** / **Save As** write project files straight to the server's mounted
+  folders ("roots"); **Open** browses those roots (filtered to `.json`) and
+  loads a project. Save writes back in place once a project has a location;
+  Save As is a two-step name → root/folder/filename browser.
+- Per-project **VFS Roots** management in Project Details, with a default save
+  folder.
+  Open / Save / Save As enable only when the server + a default root are ready.
 
 **Shell**
 
@@ -128,8 +142,10 @@ Parametric3dStudio/
         ├── main.tsx           ← React root
         ├── App.tsx            ← shell wiring
         ├── components/        ← MDI shell components (title bar, menu, tabs…)
+        │   └── panels/        ← app panels + modals (Project Details, VFS dialogs)
         ├── contexts/          ← AppStateContext (reducer), DragContext
         ├── utils/             ← actionRegistry, shortcutRegistry, layoutSerializer
+        ├── vfs/               ← VFS client: connection, admin + public API, status
         └── studio/            ← parametric modelling engine (vendored)
             ├── core/          ← expressions, sketch geometry, build geometry
             ├── components/    ← Viewport, PropertiesPanel, SidePanel

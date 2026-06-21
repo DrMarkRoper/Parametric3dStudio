@@ -10,7 +10,7 @@
  *
  * The button bar's Save (projectDetailsModal:save) commits the General tab.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ModalState } from '../../types';
 import { actionRegistry } from '../../utils/actionRegistry';
 import { useStore } from '../../studio/state/store';
@@ -22,6 +22,12 @@ import {
 } from '../../vfs/vfsAdmin';
 
 type Tab = 'general' | 'roots';
+
+/** The application-level VFS config key (shared roots, not project-specific). */
+const APP_CONFIG_KEY = 'config';
+
+/** A Default-Folder dropdown option (a root under a specific config). */
+interface RootOption { config: string; id: string; name: string; value: string; label: string }
 
 export function ProjectDetailsModal({ onClose }: { modal: ModalState; onClose: () => void }) {
   const meta = useStore((s) => s.projectMeta);
@@ -39,12 +45,9 @@ export function ProjectDetailsModal({ onClose }: { modal: ModalState; onClose: (
     actionRegistry.register('projectDetailsModal:save', () => {
       const cur = useStore.getState().projectMeta;
       useStore.getState().setProjectMeta({
-        projectId: cur.projectId,
+        ...cur,
         name: formRef.current.name.trim() || null,
         description: formRef.current.description,
-        createdAt: cur.createdAt,
-        modifiedAt: cur.modifiedAt,
-        defaultRootId: cur.defaultRootId,
       });
       useStore.setState({ dirty: true });
     });
@@ -120,6 +123,12 @@ export function ProjectDetailsModal({ onClose }: { modal: ModalState; onClose: (
             />
           </div>
 
+          {meta.defaultFilePath && (
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              File location: {meta.defaultRootConfig === APP_CONFIG_KEY ? 'Application' : 'Project'}: {meta.defaultRootName ?? '—'}/{meta.defaultFilePath}
+            </div>
+          )}
+
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
             Created: {fmtDate(meta.createdAt)} · Modified: {fmtDate(meta.modifiedAt)}
           </div>
@@ -168,38 +177,56 @@ function VfsRootsPanel({
 }: {
   projectId: string; projectName: string; description: string;
 }) {
-  const [roots, setRoots] = useState<AdminRoot[]>([]);
+  const [roots, setRoots] = useState<AdminRoot[]>([]);          // this project's roots (config = projectId)
+  const [appRoots, setAppRoots] = useState<AdminRoot[]>([]);    // application default config roots ('config')
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const defaultRootId = useStore((s) => s.projectMeta.defaultRootId);
+  const defaultRootConfig = useStore((s) => s.projectMeta.defaultRootConfig);
 
-  const setDefaultRoot = useCallback((rootId: string) => {
+  const setDefaultRoot = useCallback((config: string, rootId: string, rootName: string) => {
     const cur = useStore.getState().projectMeta;
-    if (cur.defaultRootId === rootId) return;
-    useStore.getState().setProjectMeta({ ...cur, defaultRootId: rootId });
+    if (cur.defaultRootId === rootId && cur.defaultRootConfig === config) return;
+    useStore.getState().setProjectMeta({
+      ...cur, defaultRootId: rootId, defaultRootConfig: config, defaultRootName: rootName,
+    });
     useStore.setState({ dirty: true });
   }, []);
 
   const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    listProjectRoots(projectId)
-      .then((rs) => setRoots(rs))
+    Promise.all([listProjectRoots(projectId), listProjectRoots(APP_CONFIG_KEY)])
+      .then(([proj, app]) => { setRoots(proj); setAppRoots(app); })
       .catch((e) => setError(e instanceof VfsApiError ? `${e.code}: ${e.message}` : String(e?.message ?? e)))
       .finally(() => setLoading(false));
   }, [projectId]);
 
   useEffect(() => { reload(); }, [reload]);
 
-  // First root added (or a missing/stale default) → default to the first root.
+  // Combined picker options: application 'config' roots first (prefixed), then
+  // this project's own roots. value encodes the config key + root id.
+  const options = useMemo<RootOption[]>(() => [
+    ...appRoots.map((r): RootOption => ({
+      config: APP_CONFIG_KEY, id: r.id, name: r.virtual_name, value: `${APP_CONFIG_KEY}::${r.id}`,
+      label: `Application: ${r.virtual_name}`,
+    })),
+    ...roots.map((r): RootOption => ({
+      config: projectId, id: r.id, name: r.virtual_name, value: `${projectId}::${r.id}`,
+      label: r.virtual_name,
+    })),
+  ], [appRoots, roots, projectId]);
+
+  // First option auto-set as default when none chosen / the current one is gone.
   useEffect(() => {
-    if (roots.length === 0) return;
+    if (options.length === 0) return;
     const cur = useStore.getState().projectMeta;
-    if (!cur.defaultRootId || !roots.some((r) => r.id === cur.defaultRootId)) {
-      setDefaultRoot(roots[0].id);
-    }
-  }, [roots, setDefaultRoot]);
+    const stillValid = options.some((o) => o.id === cur.defaultRootId && o.config === cur.defaultRootConfig);
+    if (!stillValid) setDefaultRoot(options[0].config, options[0].id, options[0].name);
+  }, [options, setDefaultRoot]);
+
+  const currentValue = defaultRootId && defaultRootConfig ? `${defaultRootConfig}::${defaultRootId}` : '';
 
   const openAddFolder = () => {
     actionRegistry.invoke('studio:_openAddRoot', {
@@ -222,16 +249,19 @@ function VfsRootsPanel({
 
       {error && <div style={st.error}>{error}</div>}
 
-      {roots.length > 0 && (
+      {options.length > 0 && (
         <div style={st.defaultBox}>
           <label className="dialog-field-label" style={{ marginBottom: 4 }}>Default Folder</label>
           <select
             className="dialog-input"
-            value={defaultRootId ?? ''}
-            onChange={(e) => setDefaultRoot(e.target.value)}
+            value={currentValue}
+            onChange={(e) => {
+              const opt = options.find((o) => o.value === e.target.value);
+              if (opt) setDefaultRoot(opt.config, opt.id, opt.name);
+            }}
           >
-            {roots.map((r) => (
-              <option key={r.id} value={r.id}>{r.virtual_name}</option>
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
           <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-dim)' }}>

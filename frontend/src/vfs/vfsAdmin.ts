@@ -103,6 +103,8 @@ async function adminFetch<T = unknown>(path: string, opts: RequestOptions = {}):
   let payload: BodyInit | undefined;
   if (body instanceof FormData) {
     payload = body; // browser sets the multipart boundary; do not set Content-Type
+  } else if (body instanceof Blob) {
+    payload = body; // raw bytes (file writes); fetch sets Content-Type from the Blob
   } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
@@ -213,31 +215,24 @@ function encodeVfsPath(p: string): string {
 }
 
 /**
- * Write a text file into a project's VFS root (top level by default).
- *
- * ⚠️ ENDPOINT ASSUMPTION: the authoritative skill contract documents the public
- * `/api/vfs/*` surface as read-only and lists no file-write route. This uses the
- * RESTful counterpart of the read endpoint — a multipart POST to
- * `/api/vfs/file/<root_id>/<file_path>` — as the most likely write route. If the
- * VFS server exposes a different upload endpoint/shape, change ONLY this
- * function to match.
+ * Write a text file into a VFS root via the public write endpoint:
+ *   POST /api/vfs/write/<root_id>/<file_path>?config=<config>&overwrite=<bool>
+ * Body is the raw file bytes. Requires effective write permission (else
+ * WRITE_DENIED); a name collision without overwrite gives FILE_EXISTS (409).
  */
 export function writeProjectFile(
-  projectId: string,
+  config: string,
   rootId: string,
   filePath: string,
   content: string,
-  mimeType = 'application/json',
-  signal?: AbortSignal,
+  opts: { overwrite?: boolean; mimeType?: string; signal?: AbortSignal } = {},
 ): Promise<unknown> {
-  const fileName = filePath.split('/').pop() || filePath;
-  const form = new FormData();
-  form.append('file', new Blob([content], { type: mimeType }), fileName);
-  form.append('path', filePath);
-  return adminFetch(`/api/vfs/file/${encodeURIComponent(rootId)}/${encodeVfsPath(filePath)}`, {
+  const { overwrite = false, mimeType = 'application/json', signal } = opts;
+  const blob = new Blob([content], { type: mimeType });
+  return adminFetch(`/api/vfs/write/${encodeURIComponent(rootId)}/${encodeVfsPath(filePath)}`, {
     method: 'POST',
-    body: form,
-    query: { config: projectId },
+    body: blob,
+    query: { config, overwrite: String(overwrite) },
     signal,
   });
 }

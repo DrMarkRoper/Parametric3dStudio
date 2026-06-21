@@ -34,6 +34,7 @@ import {
   newProjectCmd,
   newSketch,
   openProjectCmd,
+  importProjectCmd,
   redoCmd,
   saveProjectAsCmd,
   saveProjectCmd,
@@ -65,6 +66,7 @@ export function useStudioActions() {
     const reg: Record<string, (args?: Record<string, unknown>) => void> = {
       'studio:new': () => newProjectCmd(),
       'studio:open': () => openProjectCmd(),
+      'studio:importProject': () => importProjectCmd(),
       'studio:save': () => saveProjectCmd(),
       'studio:download': () => downloadProjectCmd(),
       'studio:saveAs': () => saveProjectAsCmd(),
@@ -90,7 +92,24 @@ export function useStudioActions() {
             props: args?.props as Record<string, unknown> | undefined,
             buttons: [
               { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
-              { label: 'Save', alignment: 'right', variant: 'primary', action: 'saveProjectModal:save', closesModal: false, keys: ['Enter'] },
+              { label: String(args?.primaryLabel ?? 'Save'), alignment: 'right', variant: 'primary', action: 'saveProjectModal:save', closesModal: false, keys: ['Enter'] },
+            ],
+          },
+        });
+      },
+      // Internal: opens the Save As VFS browser (props carry filename + onSave)
+      'studio:_openVfsSaveAs': (args) => {
+        dispatch({
+          type: 'OPEN_MODAL',
+          modal: {
+            title: 'Save to VFS',
+            componentType: 'VfsSaveAsModal',
+            width: 560,
+            allowClose: true,
+            props: args?.props as Record<string, unknown> | undefined,
+            buttons: [
+              { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
+              { label: 'Save', alignment: 'right', variant: 'primary', action: 'vfsSaveAsModal:save', closesModal: 'on-success' },
             ],
           },
         });
@@ -123,6 +142,23 @@ export function useStudioActions() {
             buttons: [
               { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
               { label: 'Save', alignment: 'right', variant: 'primary', action: 'projectDetailsModal:save', closesModal: true, keys: ['Enter'] },
+            ],
+          },
+        });
+      },
+      // Internal: opens the VFS Open browser (props carry configKey + onPick)
+      'studio:_openVfsBrowser': (args) => {
+        dispatch({
+          type: 'OPEN_MODAL',
+          modal: {
+            title: 'Open from VFS',
+            componentType: 'VfsOpenBrowserModal',
+            width: 560,
+            allowClose: true,
+            props: args?.props as Record<string, unknown> | undefined,
+            buttons: [
+              { label: 'Cancel', alignment: 'right', closesModal: true, keys: ['Escape'] },
+              { label: 'Open', alignment: 'right', variant: 'primary', action: 'vfsOpenModal:open', closesModal: 'on-success' },
             ],
           },
         });
