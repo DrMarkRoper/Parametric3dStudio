@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { uid, type Parameter } from '../types';
 import { confirmDeleteFeature, useStore } from '../state/store';
 import { isValidParamName, type Params } from '../core/expressions';
@@ -160,8 +160,42 @@ function FeatureList({ featureErrors }: { featureErrors: { featureId: string; me
       </div>
     );
   }
+  const setVis = (pred: (f: typeof s.doc.features[number]) => boolean, visible: boolean) =>
+    s.setDoc({ ...s.doc, features: s.doc.features.map((f) => (pred(f) ? { ...f, visible } : f)) });
+  const sketches = s.doc.features.filter((f) => f.type === 'sketch');
+  const objects = s.doc.features.filter((f) => f.type !== 'sketch');
+  const anyVis = s.doc.features.some((f) => f.visible);
+  const anySketchVis = sketches.some((f) => f.visible);
+  const anyObjVis = objects.some((f) => f.visible);
+  const bulkBtn: CSSProperties = { flex: 1, fontSize: 11, padding: '3px 4px', whiteSpace: 'nowrap' };
+
   return (
     <>
+      <div style={{ display: 'flex', gap: 4, padding: '2px 2px 6px', flexWrap: 'wrap' }}>
+        <button
+          style={bulkBtn}
+          title={anyVis ? 'Hide every feature' : 'Show every feature'}
+          onClick={() => setVis(() => true, !anyVis)}
+        >
+          {anyVis ? 'Hide all' : 'Show all'}
+        </button>
+        <button
+          style={bulkBtn}
+          disabled={!sketches.length}
+          title={anySketchVis ? 'Hide all sketches' : 'Show all sketches'}
+          onClick={() => setVis((f) => f.type === 'sketch', !anySketchVis)}
+        >
+          {anySketchVis ? 'Hide sketches' : 'Show sketches'}
+        </button>
+        <button
+          style={bulkBtn}
+          disabled={!objects.length}
+          title={anyObjVis ? 'Hide all bodies (extrudes, primitives, imports)' : 'Show all bodies'}
+          onClick={() => setVis((f) => f.type !== 'sketch', !anyObjVis)}
+        >
+          {anyObjVis ? 'Hide objects' : 'Show objects'}
+        </button>
+      </div>
       {s.doc.features.map((f) => {
         const sketchName =
           f.type === 'extrude'
