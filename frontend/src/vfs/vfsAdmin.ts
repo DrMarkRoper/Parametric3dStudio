@@ -101,7 +101,9 @@ async function adminFetch<T = unknown>(path: string, opts: RequestOptions = {}):
 
   const headers: Record<string, string> = { Accept: 'application/json' };
   let payload: BodyInit | undefined;
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    payload = body; // browser sets the multipart boundary; do not set Content-Type
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
   }
@@ -201,6 +203,41 @@ export function validatePath(path: string, signal?: AbortSignal): Promise<PathVa
   return adminFetch<PathValidation>('/api/admin/validate-path', {
     query: { path },
     appScoped: false,
+    signal,
+  });
+}
+
+/** Encode a forward-slashed VFS path, preserving the separators. */
+function encodeVfsPath(p: string): string {
+  return p.split('/').map(encodeURIComponent).join('/');
+}
+
+/**
+ * Write a text file into a project's VFS root (top level by default).
+ *
+ * ⚠️ ENDPOINT ASSUMPTION: the authoritative skill contract documents the public
+ * `/api/vfs/*` surface as read-only and lists no file-write route. This uses the
+ * RESTful counterpart of the read endpoint — a multipart POST to
+ * `/api/vfs/file/<root_id>/<file_path>` — as the most likely write route. If the
+ * VFS server exposes a different upload endpoint/shape, change ONLY this
+ * function to match.
+ */
+export function writeProjectFile(
+  projectId: string,
+  rootId: string,
+  filePath: string,
+  content: string,
+  mimeType = 'application/json',
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const fileName = filePath.split('/').pop() || filePath;
+  const form = new FormData();
+  form.append('file', new Blob([content], { type: mimeType }), fileName);
+  form.append('path', filePath);
+  return adminFetch(`/api/vfs/file/${encodeURIComponent(rootId)}/${encodeVfsPath(filePath)}`, {
+    method: 'POST',
+    body: form,
+    query: { config: projectId },
     signal,
   });
 }

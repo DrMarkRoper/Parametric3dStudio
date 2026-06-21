@@ -63,7 +63,8 @@ function deserializeGeometry(m: SerializedMesh): THREE.BufferGeometry {
   return g;
 }
 
-export function saveProject(doc: Doc, fileName = 'project.cad.json', meta?: ProjectMeta) {
+/** Build the serialized project JSON string (the `.cad.json` payload). */
+export function serializeProject(doc: Doc, meta?: ProjectMeta): string {
   // Serialize geometry for every embedded import that actually has cached mesh data.
   const meshes: Record<string, SerializedMesh> = {};
   for (const f of doc.features) {
@@ -83,7 +84,12 @@ export function saveProject(doc: Doc, fileName = 'project.cad.json', meta?: Proj
     doc,
     meshes,
   };
-  download(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), fileName);
+  return JSON.stringify(payload, null, 2);
+}
+
+/** Save the project as a local browser download. */
+export function saveProject(doc: Doc, fileName = 'project.cad.json', meta?: ProjectMeta) {
+  download(new Blob([serializeProject(doc, meta)], { type: 'application/json' }), fileName);
 }
 
 export async function loadProject(file: File): Promise<{ doc: Doc; meta: ProjectMeta }> {

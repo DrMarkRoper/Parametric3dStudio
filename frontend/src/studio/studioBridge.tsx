@@ -36,7 +36,8 @@ import {
   type SketchFeature,
   type Vec3,
 } from './types';
-import { exportSTL, loadProject, saveProject } from './io/exporters';
+import { exportSTL, loadProject, saveProject, serializeProject } from './io/exporters';
+import { isVfsConfigured, writeProjectFile, VfsApiError } from '../vfs/vfsAdmin';
 import { IMPORT_EXTENSIONS, importModelFile } from './io/importers';
 
 type RegenResult = ReturnType<typeof regenerate>;
@@ -108,10 +109,12 @@ function openSaveProjectDialog(
 }
 
 /**
- * Save the current project. First save (or no name) → prompt for name/description;
- * subsequent saves update the modifiedAt date and reuse the stored name.
+ * Download the current project as a local `.cad.json` file. First save (or no
+ * name) → prompt for name/description; subsequent saves update modifiedAt and
+ * reuse the stored name. (This is the original "Save" behaviour, now exposed via
+ * File ▸ Download.)
  */
-export function saveProjectCmd() {
+export function downloadProjectCmd() {
   const s = useStore.getState();
   const meta = s.projectMeta;
   const doSave = (next: { name: string; description: string }) => {
@@ -134,6 +137,58 @@ export function saveProjectCmd() {
   }
   // Quick save: update modifiedAt and write to disk with the existing name.
   doSave({ name: meta.name, description: meta.description });
+}
+
+/**
+ * Save the current project to its VFS default root on the server. Requires a
+ * configured VFS connection, a project name, and a default root (the File ▸ Save
+ * menu item is disabled otherwise). Writes the `.cad.json` payload to the root's
+ * top level under the project's file name.
+ */
+export function saveProjectCmd() {
+  const meta = useStore.getState().projectMeta;
+
+  if (!isVfsConfigured() || !meta.defaultRootId) {
+    dialogService.showAlert({
+      title: 'Save Project',
+      message: 'Configure a VFS server (File ▸ Application Settings) and a default folder (File ▸ Project Details ▸ VFS Roots) before saving.',
+      mode: 'warning',
+    });
+    return;
+  }
+
+  const name = (meta.name ?? '').trim();
+  if (!name) {
+    dialogService.showAlert({
+      title: 'Save Project',
+      message: 'Give the project a name in Project Details before saving.',
+      mode: 'warning',
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const updated: ProjectMeta = {
+    ...meta,
+    name,
+    createdAt: meta.createdAt ?? now,
+    modifiedAt: now,
+  };
+  const fileName = projectFileName(name);
+  const content = serializeProject(useStore.getState().doc, updated);
+
+  writeProjectFile(updated.projectId, meta.defaultRootId, fileName, content)
+    .then(() => {
+      useStore.getState().setProjectMeta(updated);
+      useStore.getState().markClean();
+    })
+    .catch((e) => {
+      dialogService.showAlert({
+        title: 'Save failed',
+        message: e instanceof VfsApiError ? `${e.code}: ${e.message}` : String((e as Error)?.message ?? e),
+        mode: 'error',
+      });
+    });
 }
 
 /** Always prompt with the stored details pre-filled, then save under a (possibly new) name. */
