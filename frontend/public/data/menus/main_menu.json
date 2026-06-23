@@ -8,11 +8,11 @@
       { "id": "file-open",    "type": "action", "label": "Open Project…",     "icon": "📂", "shortcut": "Ctrl+Shift+O", "shortcutKey": { "ctrl": true, "shift": true, "key": "o" }, "action": "studio:open",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save",    "type": "action", "label": "Save Project",      "icon": "💾", "shortcut": "Ctrl+Shift+S", "shortcutKey": { "ctrl": true, "shift": true, "key": "s" }, "action": "studio:save",     "visible": true, "disabled": false, "children": [] },
       { "id": "file-save-as", "type": "action", "label": "Save Project As…",  "icon": "💾", "shortcut": "Ctrl+Shift+A", "shortcutKey": { "ctrl": true, "shift": true, "key": "a" }, "action": "studio:saveAs",   "visible": true, "disabled": false, "children": [] },
+      { "id": "file-sep-0", "type": "separator" },
+      { "id": "file-project-details", "type": "action", "label": "Project Details…",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.3' width='14' height='14'><path d='M4 2h5l3 3v9H4z'/><path d='M9 2v3h3'/><path d='M6 8.5h4M6 11h4'/></svg>", "action": "studio:projectDetails", "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-import", "type": "separator" },
       { "id": "file-download", "type": "action", "label": "Download",          "icon": "⬇", "action": "studio:download", "visible": true, "disabled": false, "children": [] },
       { "id": "file-import", "type": "action", "label": "Import…",             "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.3' width='14' height='14'><path d='M8 2.5v6.5'/><path d='M5.5 6.5 8 9l2.5-2.5'/><path d='M2.5 10.5v1.8a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1.8'/></svg>", "action": "studio:importProject", "visible": true, "disabled": false, "children": [] },
-      { "id": "file-sep-0", "type": "separator" },
-      { "id": "file-project-details", "type": "action", "label": "Project Details…",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.3' width='14' height='14'><path d='M4 2h5l3 3v9H4z'/><path d='M9 2v3h3'/><path d='M6 8.5h4M6 11h4'/></svg>", "action": "studio:projectDetails", "visible": true, "disabled": false, "children": [] },
       { "id": "file-sep-1", "type": "separator" },
       { "id": "file-export",  "type": "action", "label": "Export as STL…",    "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:exportStl", "visible": true, "disabled": false, "children": [] }
     ]
@@ -44,7 +44,10 @@
         ]
       },
       { "id": "cr-sep-import", "type": "separator" },
-      { "id": "cr-importstl",  "type": "action", "label": "Import STL",  "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "action": "studio:import", "visible": true, "disabled": false, "children": [] },
+      { "id": "cr-importstl",  "type": "submenu", "label": "Import STL",  "icon": "<svg viewBox='0 0 16 16' fill='currentColor' width='14' height='14'><text x='8' y='11' text-anchor='middle' font-size='7' font-weight='700' font-family='inherit'>STL</text></svg>", "visible": true, "disabled": false, "children": [
+        { "id": "cr-importstl-pc",     "type": "action", "label": "Open from computer", "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='2' y='3' width='12' height='7.5' rx='0.6'/><path d='M6 13.3h4M8 10.5v2.8'/></svg>", "action": "studio:import",       "visible": true, "disabled": false, "children": [] },
+        { "id": "cr-importstl-server", "type": "action", "label": "Open from server",   "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='2.5' y='3' width='11' height='4' rx='0.6'/><rect x='2.5' y='9' width='11' height='4' rx='0.6'/><path d='M4.6 5h0.01M4.6 11h0.01'/></svg>", "action": "studio:importServer", "visible": true, "disabled": false, "children": [] }
+      ] },
       { "id": "cr-sep-1", "type": "separator" },
       { "id": "cr-extrude",  "type": "action", "label": "Extrude",  "icon": "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='3' y='10' width='10' height='3.5'/><path d='M8 9 L8 2.5 M5.5 5 L8 2.5 L10.5 5'/></svg>", "action": "studio:extrude", "visible": true, "disabled": false, "children": [] },
       { "id": "cr-sep-2", "type": "separator" },

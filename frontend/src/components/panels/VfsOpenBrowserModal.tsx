@@ -13,16 +13,21 @@ import { VfsApiError } from '../../vfs/vfsAdmin';
 interface PickArg { rootId: string; rootName: string; filePath: string; name: string; configKey: string }
 interface BrowserProps {
   configKey: string;
+  /** Allowed file extensions (lowercase, no dot). Defaults to ['json']. */
+  extensions?: string[];
   onPick: (sel: PickArg) => Promise<void>;
 }
 
-function isJson(name: string): boolean {
-  return /\.json$/i.test(name); // matches .json and .cad.json
+function extOf(name: string): string {
+  const i = name.lastIndexOf('.');
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : '';
 }
 
 export function VfsOpenBrowserModal({ modal }: { modal: ModalState; onClose: () => void }) {
   const props = (modal.props ?? {}) as unknown as BrowserProps;
   const configKey = props.configKey;
+  const accept = props.extensions ?? ['json'];
+  const matches = (name: string) => accept.includes(extOf(name));
 
   const [roots, setRoots] = useState<PublicRoot[]>([]);
   const [rootId, setRootId] = useState<string>('');
@@ -85,11 +90,11 @@ export function VfsOpenBrowserModal({ modal }: { modal: ModalState; onClose: () 
   const goUp = useCallback(() => setPath((p) => p.split('/').slice(0, -1).join('/')), []);
   const open = (e: VfsEntry) => {
     if (e.type === 'folder') setPath(path ? `${path}/${e.name}` : e.name);
-    else if (isJson(e.name)) setSelected(e.name);
+    else if (matches(e.name)) setSelected(e.name);
   };
 
   const crumbs = path ? path.split('/') : [];
-  const visible = entries.filter((e) => e.type === 'folder' || isJson(e.name));
+  const visible = entries.filter((e) => e.type === 'folder' || matches(e.name));
 
   return (
     <div className="modal-content-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -128,7 +133,7 @@ export function VfsOpenBrowserModal({ modal }: { modal: ModalState; onClose: () 
             key={e.name}
             style={{ ...st.row, ...(e.type === 'file' && selected === e.name ? st.rowActive : {}) }}
             onClick={() => open(e)}
-            onDoubleClick={() => { if (e.type === 'file' && isJson(e.name)) { setSelected(e.name); actionRegistry.invoke('vfsOpenModal:open'); } }}
+            onDoubleClick={() => { if (e.type === 'file' && matches(e.name)) { setSelected(e.name); actionRegistry.invoke('vfsOpenModal:open'); } }}
             title={e.name}
           >
             <span style={{ width: 18 }}>{e.type === 'folder' ? '📁' : '📄'}</span>

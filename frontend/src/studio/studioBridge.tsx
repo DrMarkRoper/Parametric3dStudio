@@ -38,7 +38,7 @@ import {
 } from './types';
 import { exportSTL, loadProject, saveProject, serializeProject } from './io/exporters';
 import { isVfsConfigured, listProjectRoots, writeProjectFile, VfsApiError } from '../vfs/vfsAdmin';
-import { fetchFileText } from '../vfs/vfsApi';
+import { fetchFileText, fetchFileBlob } from '../vfs/vfsApi';
 import { IMPORT_EXTENSIONS, importModelFile } from './io/importers';
 
 type RegenResult = ReturnType<typeof regenerate>;
@@ -760,6 +760,98 @@ export function deleteAssemblyCmd() {
   else if (s.assembly.selectedJointId) s.removeJoint(s.assembly.selectedJointId);
 }
 
+// ── Model import / image insert (shared by local + VFS pickers) ────────────
+
+/** Import one model File (STL/OBJ/glTF/GLB/STEP) and add it as a feature. */
+export async function importModelFromFile(file: File): Promise<void> {
+  const s = useStore.getState();
+  try {
+    const res = await importModelFile(file);
+    const id = uid();
+    importCache.set(id, res.geometry);
+    const f: ImportFeature = {
+      id,
+      type: 'import',
+      name: file.name,
+      visible: true,
+      fileName: file.name,
+      position: [0, res.groundY, 0],
+      rotation: [0, 0, 0],
+      scale: 1,
+      color: res.color ?? nextColor(),
+    };
+    s.addFeature(f);
+  } catch (e) {
+    dialogService.showAlert({
+      title: 'Import failed',
+      message: e instanceof Error ? e.message : String(e),
+      mode: 'error',
+    });
+  }
+}
+
+/** Load one image File as the pending sketch image and switch to the Image tool. */
+export function insertImageFromFile(file: File): Promise<void> {
+  return new Promise((resolve) => {
+    const s = useStore.getState();
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        s.setPendingImage({ src, fileName: file.name, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+        s.setTool('image');
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = src;
+    };
+    reader.onerror = () => resolve();
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Image file extensions offered by the "Insert Image ▸ from server" browser. */
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'];
+
+/** Open the VFS browser to pick a model file and import it. */
+export function importModelFromServerCmd() {
+  if (!isVfsConfigured()) {
+    dialogService.showAlert({ title: 'Import from server', message: 'Configure a VFS server (File ▸ Application Settings) first.', mode: 'warning' });
+    return;
+  }
+  actionRegistry.invoke('studio:_openVfsBrowser', {
+    title: 'Import model from VFS',
+    props: {
+      configKey: 'config',
+      extensions: IMPORT_EXTENSIONS.map((e) => e.replace(/^\./, '')),
+      onPick: async (sel: { rootId: string; filePath: string; name: string; configKey: string }) => {
+        const blob = await fetchFileBlob(sel.rootId, sel.filePath, sel.configKey);
+        await importModelFromFile(new File([blob], sel.name));
+      },
+    },
+  });
+}
+
+/** Open the VFS browser to pick an image and insert it into the sketch. */
+export function insertImageFromServerCmd() {
+  if (!isVfsConfigured()) {
+    dialogService.showAlert({ title: 'Insert image from server', message: 'Configure a VFS server (File ▸ Application Settings) first.', mode: 'warning' });
+    return;
+  }
+  actionRegistry.invoke('studio:_openVfsBrowser', {
+    title: 'Insert image from VFS',
+    props: {
+      configKey: 'config',
+      extensions: IMAGE_EXTENSIONS,
+      onPick: async (sel: { rootId: string; filePath: string; name: string; configKey: string }) => {
+        const blob = await fetchFileBlob(sel.rootId, sel.filePath, sel.configKey);
+        await insertImageFromFile(new File([blob], sel.name));
+      },
+    },
+  });
+}
+
 // ── Hidden file inputs ─────────────────────────────────────────────────────
 // The MDI toolbar is action driven and cannot render <input type=file>, so we
 // host the inputs once (in the Canvas panel) and expose click triggers.
@@ -795,52 +887,13 @@ export function StudioFileInputs() {
 
   const onImport = async (files: FileList | null) => {
     if (!files) return;
-    const s = useStore.getState();
-    for (const file of Array.from(files)) {
-      try {
-        const res = await importModelFile(file);
-        const id = uid();
-        importCache.set(id, res.geometry);
-        const f: ImportFeature = {
-          id,
-          type: 'import',
-          name: file.name,
-          visible: true,
-          fileName: file.name,
-          position: [0, res.groundY, 0],
-          rotation: [0, 0, 0],
-          scale: 1,
-          color: res.color ?? nextColor(),
-        };
-        s.addFeature(f);
-      } catch (e) {
-        alert(`Import failed: ${e instanceof Error ? e.message : e}`);
-      }
-    }
+    for (const file of Array.from(files)) await importModelFromFile(file);
     if (fileRef.current) fileRef.current.value = '';
   };
 
   const onPickImage = async (files: FileList | null) => {
     if (!files?.[0]) return;
-    const s = useStore.getState();
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const pending: PendingImage = {
-          src,
-          fileName: file.name,
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-        };
-        s.setPendingImage(pending);
-        s.setTool('image');
-      };
-      img.src = src;
-    };
-    reader.readAsDataURL(file);
+    await insertImageFromFile(files[0]);
     if (imgRef.current) imgRef.current.value = '';
   };
 

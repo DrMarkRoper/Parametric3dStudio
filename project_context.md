@@ -426,9 +426,9 @@ mode:
   hand-built `SKETCH_MENU_CHILDREN` (Select, Line, Rect, Circle / Oval, Arc,
   **Custom ▸** (cascading submenu — currently just `Cog`, sized to grow as
   more parametric shape tools are added), Fillet, Chamfer, Offset,
-  Construction, Measure, Dimension, Insert Image, Extrude, Finish Sketch),
-  each carrying the same SVG glyph as the toolbar so the menu and the toolbar
-  read identically. The Cog tool is *menu-only* — it has no toolbar button,
+  Construction, Measure, Dimension, **Insert Image ▸** (Open from computer /
+  Open from server — §11.4), Extrude, Finish Sketch), each carrying the same SVG
+  glyph as the toolbar so the menu and the toolbar read identically. The Cog tool is *menu-only* — it has no toolbar button,
   by design: the toolbar is reserved for the always-available primitives and
   the Custom submenu hosts parametric shapes.
 - **Sketch menu**: `sk-top` / `sk-front` / `sk-right` / `sk-face` get
@@ -478,18 +478,21 @@ Visibility rules in the bridge:
 
 The menu bar (`public/data/menus/main_menu.json`) mirrors the actions:
 
-- **File**: **Application Settings…** (`studio:appSettings` — VFS connection
-  dialog, §11) · New (Ctrl+Shift+N), Open (Ctrl+Shift+O — **VFS open browser**),
-  Save (Ctrl+Shift+S — **VFS write-back / falls through to Save As for a new
-  project**), **Save Project As…** (Ctrl+Shift+A — **two-step VFS save**),
-  **Download** (`studio:download` — original local-file save) · **Import…**
-  (`studio:importProject` — original local-file open) · **Project Details…**
+- **File** (top-to-bottom order): **Application Settings…**
+  (`studio:appSettings` — VFS connection dialog, §11) · New (Ctrl+Shift+N),
+  Open (Ctrl+Shift+O — **VFS open browser**), Save (Ctrl+Shift+S — **VFS
+  write-back / falls through to Save As for a new project**), **Save Project
+  As…** (Ctrl+Shift+A — **two-step VFS save**) · **Project Details…**
   (`studio:projectDetails` — tabbed General + VFS Roots modal, §11) ·
-  Export as STL… · Open / Save / Save As are disabled until the VFS is ready
-  (server + default root) — see §11.
+  **Download** (`studio:download` — original local-file save), **Import…**
+  (`studio:importProject` — original local-file open) · Export as STL… ·
+  Open / Save / Save As are disabled until the VFS is ready (server + default
+  root) — see §11.
 - **Edit**: Undo, Redo
 - **Create**: Cube, Sphere, Cylinder, Cone, Torus, **Custom ▸** (Bulb screw,
-  Bulb socket, Screw thread, Nut thread) · Import STL · Extrude · Move, Rotate,
+  Bulb socket, Screw thread, Nut thread) · **Import STL ▸** (Open from computer /
+  Open from server — §11.4; same submenu on the `tb-create` toolbar dropdown) ·
+  Extrude · Move, Rotate,
   Merge · **Advanced ▸** (Re-select Profiles… / Use All Profiles — operate on the
   selected extrude; disabled-state set by `useSketchAwareMenu` from the selection;
   these replaced the old buttons in the extrude Info panel) (in sketch mode the
@@ -853,7 +856,8 @@ under `components/panels/`.
   `isVfsConfigured()` = server + app id present.
 - **`vfsApi.ts`** — public surface: `listRoots(config)` (with `can_read` /
   `can_write`), `browse(rootId, subPath, config)`, `fetchFileText` (loads a
-  saved project), `streamUrl`.
+  saved project), `fetchFileBlob` (raw bytes — model import / image insert),
+  `streamUrl`.
 - **`vfsStatus.ts`** — an external store (`useVfsAppReady()` /
   `refreshVfsStatus()`); "app ready" = server reachable AND the `config` topic
   has ≥1 root. Probed on app load (in `AppInner`) and after Application Settings
@@ -912,6 +916,16 @@ on load.
 - **`newProjectCmd`** — after resetting, `seedApplicationDefaultRoot()` best-effort
   sets the new project's default root to the first `config` root if the server is
   reachable.
+- **Model import + image insert — computer or server.** The Create ▸ **Import STL**
+  and sketch ▸ **Insert Image** entries are submenus / toolbar dropdowns, each
+  with *Open from computer* (the local file picker — `studio:import` /
+  `studio:image`) and *Open from server* (`studio:importServer` /
+  `studio:imageServer` → `importModelFromServerCmd` / `insertImageFromServerCmd`).
+  The "from server" path opens the VFS browser (`_openVfsBrowser`) filtered to the
+  model extensions / image extensions, `fetchFileBlob`s the pick, then runs it
+  through the shared `importModelFromFile` / `insertImageFromFile` helpers (the
+  same pipeline the local pickers use). `VfsOpenBrowserModal` takes an
+  `extensions` prop (default `['json']`) and an optional title for this reuse.
 
 ### 11.5 Menu gating (`App.tsx` `useSketchAwareMenu`)
 

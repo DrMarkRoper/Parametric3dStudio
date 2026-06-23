@@ -87,8 +87,8 @@ export function browse(rootId: string, subPath: string, configKey: string, signa
   return vfsGet<VfsBrowseResult>(path, { config: configKey }, signal);
 }
 
-/** Fetch a file's raw text content (used to load a saved project). */
-export async function fetchFileText(rootId: string, filePath: string, configKey: string, signal?: AbortSignal): Promise<string> {
+/** Build the raw file URL + fetch a Response (shared by text/blob readers). */
+async function fetchFile(rootId: string, filePath: string, configKey: string, signal?: AbortSignal): Promise<Response> {
   const { base, appId } = baseAndApp();
   if (!base) throw new VfsApiError('No VFS server address configured.', 'NOT_CONFIGURED', 0);
   const params = new URLSearchParams({ app: appId, config: configKey });
@@ -106,5 +106,15 @@ export async function fetchFileText(rootId: string, filePath: string, configKey:
     try { const b = await res.json() as { error?: string; code?: string }; code = b.code ?? code; msg = b.error ?? msg; } catch { /* non-JSON */ }
     throw new VfsApiError(msg, code, res.status);
   }
-  return res.text();
+  return res;
+}
+
+/** Fetch a file's raw text content (used to load a saved project). */
+export async function fetchFileText(rootId: string, filePath: string, configKey: string, signal?: AbortSignal): Promise<string> {
+  return (await fetchFile(rootId, filePath, configKey, signal)).text();
+}
+
+/** Fetch a file's raw bytes (used to import models / insert images). */
+export async function fetchFileBlob(rootId: string, filePath: string, configKey: string, signal?: AbortSignal): Promise<Blob> {
+  return (await fetchFile(rootId, filePath, configKey, signal)).blob();
 }

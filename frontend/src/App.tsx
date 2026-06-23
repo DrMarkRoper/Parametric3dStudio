@@ -548,6 +548,8 @@ const ICON_MEASURE = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor'
 const ICON_DIM = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' width='14' height='14'><path d='M3 4 L3 12'/><path d='M13 4 L13 12'/><path d='M3 8 L13 8'/><path d='M3 8 L5 6.5 M3 8 L5 9.5'/><path d='M13 8 L11 6.5 M13 8 L11 9.5'/></svg>";
 const ICON_CONSTR = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-dasharray='2 2.4' width='14' height='14'><path d='M2 8 L14 8'/></svg>";
 const ICON_IMAGE = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='2' y='3.5' width='12' height='9' rx='0.5'/><circle cx='5.5' cy='6.5' r='1.1'/><path d='M2.5 12 L6 8 L9 10.5 L11 8.5 L13.5 12'/></svg>";
+const ICON_COMPUTER = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='2' y='3' width='12' height='7.5' rx='0.6'/><path d='M6 13.3h4M8 10.5v2.8'/></svg>";
+const ICON_SERVER = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='2.5' y='3' width='11' height='4' rx='0.6'/><rect x='2.5' y='9' width='11' height='4' rx='0.6'/><path d='M4.6 5h0.01M4.6 11h0.01'/></svg>";
 const ICON_EXTRUDE = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round' stroke-linecap='round' width='14' height='14'><rect x='3' y='10' width='10' height='3.5'/><path d='M8 9 L8 2.5 M5.5 5 L8 2.5 L10.5 5'/></svg>";
 
 const SKETCH_MENU_CHILDREN: MenuItem[] = [
@@ -571,7 +573,10 @@ const SKETCH_MENU_CHILDREN: MenuItem[] = [
   { id: 'cr-sk-measure',   type: 'action', label: 'Measure',         icon: ICON_MEASURE, action: 'studio:tool:measure',   visible: true, disabled: false, children: [] },
   { id: 'cr-sk-dimension', type: 'action', label: 'Dimension',       icon: ICON_DIM,     action: 'studio:tool:dimension', visible: true, disabled: false, children: [] },
   { id: 'cr-sk-sep-3',     type: 'separator' },
-  { id: 'cr-sk-image',     type: 'action', label: 'Insert Image',    icon: ICON_IMAGE,   action: 'studio:image',          visible: true, disabled: false, children: [] },
+  { id: 'cr-sk-image',     type: 'submenu', label: 'Insert Image',    icon: ICON_IMAGE,   visible: true, disabled: false, children: [
+    { id: 'cr-sk-image-pc',     type: 'action', label: 'Open from computer', icon: ICON_COMPUTER, action: 'studio:image',       visible: true, disabled: false, children: [] },
+    { id: 'cr-sk-image-server', type: 'action', label: 'Open from server',   icon: ICON_SERVER,   action: 'studio:imageServer', visible: true, disabled: false, children: [] },
+  ] },
   { id: 'cr-sk-sep-4',     type: 'separator' },
   { id: 'cr-sk-extrude',   type: 'action', label: 'Extrude',         icon: ICON_EXTRUDE, action: 'studio:extrude',        visible: true, disabled: false, children: [] },
   { id: 'cr-sk-finish',    type: 'action', label: 'Finish Sketch',   icon: '✓',          action: 'studio:finish',         visible: true, disabled: false, children: [] },

@@ -31,6 +31,8 @@ import {
   exportStlCmd,
   fileTriggers,
   finishSketch,
+  importModelFromServerCmd,
+  insertImageFromServerCmd,
   newProjectCmd,
   newSketch,
   openProjectCmd,
@@ -151,7 +153,7 @@ export function useStudioActions() {
         dispatch({
           type: 'OPEN_MODAL',
           modal: {
-            title: 'Open from VFS',
+            title: String(args?.title ?? 'Open from VFS'),
             componentType: 'VfsOpenBrowserModal',
             width: 560,
             allowClose: true,
@@ -181,6 +183,7 @@ export function useStudioActions() {
         });
       },
       'studio:import': () => fileTriggers.importModel?.(),
+      'studio:importServer': () => importModelFromServerCmd(),
       'studio:exportStl': () => exportStlCmd(),
       'studio:undo': () => undoCmd(),
       'studio:redo': () => redoCmd(),
@@ -227,6 +230,7 @@ export function useStudioActions() {
       'studio:tool:offset': () => useStore.getState().setTool('offset'),
       'studio:construction': () => toggleConstruction(),
       'studio:image': () => fileTriggers.pickImage?.(),
+      'studio:imageServer': () => insertImageFromServerCmd(),
       'studio:finish': () => finishSketch(),
 
       // Assembly mode
